@@ -454,7 +454,13 @@ char pick_file(char* name, char** extData, int numExts) {
 		int pos = 0;
 		if (HARDWARE_STATUS_NO_DISK & *HARDWARE_STATUS) {
 			putText("Please insert a disk.\n");
-			while (HARDWARE_STATUS_NO_DISK & *HARDWARE_STATUS);
+			while (HARDWARE_STATUS_NO_DISK & *HARDWARE_STATUS) {
+				if (kbhit()) {
+					char c = getch();
+					if (c == KEYBOARD_BREAK || c == 27)
+						return 0;
+				}
+			}
 		}
 			
 		while (-1 != getDirEntry(i, &d) && pos < 36) {
