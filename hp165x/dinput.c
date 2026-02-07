@@ -85,6 +85,7 @@ enum input_type {
 	INPUT_LINE_CONTINUED,
 };
 
+int getTextContinuable(char* _buffer, uint16_t maxSize, int timeoutTicks, char continued);
 char pick_file(char* name, char** extData, int numExts);
 long timeTenths(void);
 
@@ -177,7 +178,7 @@ bool dumb_handle_setting(const char *setting, bool show_cursor, bool startup)
 		if (!strcmp(setting, "set")) {
 			printf("Speed Factor %d\n", speed_100);
 			printf("More Prompts %s\n",
-				do_more_prompts ? "ON" : "OFF");
+ 				do_more_prompts ? "ON" : "OFF");
 		}
 		return dumb_output_handle_setting(setting, show_cursor, startup);
 	}
@@ -191,30 +192,32 @@ bool dumb_handle_setting(const char *setting, bool show_cursor, bool startup)
  * Return true if timed-out.  */
 static bool dumb_read_line(char *s, char *prompt, bool show_cursor,
 			   int timeout, enum input_type type,
-			   zchar *continued_line_chars)
+			   zchar *continued_line_chars, bool continued)
 {
 	time_t start_time = timeTenths();
 
 	dumb_show_screen(show_cursor);
 	for (;;) {
 		char *command;
-		if (prompt)
-			putText(prompt);
-		else
-			dumb_show_prompt(show_cursor,
-				(timeout ? "tTD" : ")>}")[type]);
-
-		/* Prompt only shows up after user input if we don't flush stdout */
-		*s = 0;
-		int n = getTextWithTimeout(s, INPUT_BUFFER_SIZE-2, timeout*6);
-		printf("\n");
-		if (0 <= n) {
-			s[n] = '\n';
-			s[n+1] = 0;
+		if (!continued) {
+			if (prompt)
+				putText(prompt);
+			else
+				dumb_show_prompt(show_cursor,
+					(timeout ? "tTD" : ")>}")[type]);
 		}
-		else if (-1 == n) {
-			strcpy(s, "quit\n");
-			putText(s);
+
+		int n = getTextContinuable(s, INPUT_BUFFER_SIZE-2, timeout*6, continued);
+		if (n != ERROR_TIMEOUT) {
+			printf("\n");
+			if (0 <= n) {
+				s[n] = '\n';
+				s[n+1] = 0;
+			}
+			else if (-1 == n) {
+				strcpy(s, "quit\n");
+				putText(s);
+			}
 		}
 
 		if ((s[0] != '\\') || ((s[1] != '\0') && !islower(s[1]))) {
@@ -293,7 +296,7 @@ static bool dumb_read_line(char *s, char *prompt, bool show_cursor,
  * filename requests).  */
 static void dumb_read_misc_line(char *s, char *prompt)
 {
-	dumb_read_line(s, prompt, 0, 0, 0, 0);
+	dumb_read_line(s, prompt, 0, 0, 0, 0, 0);
 	/* Remove terminating newline */
 	s[strlen(s) - 1] = '\0';
 } /* dumb_read_misc_line */
@@ -379,7 +382,7 @@ zchar os_read_line (int UNUSED (max), zchar *buf, int timeout, int UNUSED(width)
 	if (read_line_buffer[0] == '\0') {
 		timed_out = dumb_read_line(read_line_buffer, NULL, TRUE,
 			timeout * 100 / speed_100, buf[0] ? INPUT_LINE_CONTINUED : INPUT_LINE,
-			buf);
+			buf, continued);
 	} 
 
 	if (timed_out) {
@@ -473,6 +476,7 @@ char pick_file(char* name, char** extData, int numExts) {
 				if (i>0 && pos%4==0)
 					putText("\n");
 				printf("[%c] %-10s  ", c, d.name);
+				pos++;
 			}
 			i++;
 		}
@@ -546,12 +550,8 @@ char *os_read_file_name (const char *default_name, int flag)
 
 	FILE *fp;
 	char *tempname;
-	char path_separator[2];
 	char *ext;
 	bool freebuf = FALSE;
-
-	path_separator[0] = PATH_SEPARATOR;
-	path_separator[1] = 0;
 
 	/* If we're restoring a game before the interpreter starts,
  	 * our filename is already provided.  Just go ahead silently.

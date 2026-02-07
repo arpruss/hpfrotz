@@ -434,6 +434,7 @@ zchar os_read_line (int UNUSED (max), zchar *buf, int timeout, int UNUSED(width)
 	int i, j, len;
 #endif
 
+printf("ARP time ahead 0: %d\n", time_ahead);
 	/* Discard any keys read for single key input.  */
 	read_key_buffer[0] = '\0';
 
@@ -442,12 +443,15 @@ zchar os_read_line (int UNUSED (max), zchar *buf, int timeout, int UNUSED(width)
 	if (timed_out_last_time && !continued)
 		read_line_buffer[0] = '\0';
 
+printf("ARP timeout: %d\n", timeout);
 	if (read_line_buffer[0] == '\0') {
 		timed_out = dumb_read_line(read_line_buffer, NULL, TRUE,
 			timeout, buf[0] ? INPUT_LINE_CONTINUED : INPUT_LINE,
 			buf);
 	} else
 		timed_out = check_timeout(timeout);
+printf("ARP timed_out: %d\n", timed_out);
+printf("ARP time ahead: %d\n", time_ahead);
 
 	if (timed_out) {
 		timed_out_last_time = TRUE;
