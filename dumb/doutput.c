@@ -586,6 +586,8 @@ void os_display_char (zchar c)
 void os_display_string (const zchar *s)
 {
 	zchar c;
+	
+printf("ARP:display_string:[%s]",s);
 
 	while ((c = *s++) != 0) {
 		if (c == ZC_NEW_FONT)

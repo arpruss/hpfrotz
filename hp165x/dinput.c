@@ -55,7 +55,7 @@ static char runtime_usage[] =
 	"  Misc Settings:\n"
 	"    \\sfX     Set speed factor to X.  (0 = never timeout automatically).\n"
 	"    \\mp      Toggle use of MORE prompts\n"
-	"    \\ln      Toggle display of line numbers.\n"
+	"    \\pr      Toggle display of line numbers.\n"
 	"    \\lt      Toggle display of the line type identification chars.\n"
 	"    \\vb      Toggle visual bell.\n"
 	"    \\pb      Toggle display of picture outline boxes.\n"
@@ -89,19 +89,152 @@ int getTextContinuable(char* _buffer, uint16_t maxSize, int timeoutTicks, char c
 char pick_file(char* name, char** extData, int numExts);
 long timeTenths(void);
 
-/* Read one line, including the newline, into s.  Safely avoids buffer
- * overruns (but that's kind of pointless because there are several
- * other places where I'm not so careful).  */
-static void dumb_getline(char *s)
-{
-	*s = 0;
-	getText(s, INPUT_BUFFER_SIZE-2);
-	printf("\n");
-	int l = strlen(s);
-	s[l] = '\n';
-	s[l+1] = 0;
-} 
+static uint16_t startX;
+static uint16_t startY;
+static uint16_t cols;
+static uint16_t rows;
+static char* buffer;
+static uint16_t cursor;
+static uint16_t length;
 
+static void setXYFromOffset(uint16_t offset) {
+	uint16_t p = startX + offset;
+	uint16_t row = startY + p / cols;
+	uint16_t col = p % cols;
+	if (row >= rows) {
+		uint16_t delta = row - rows + 1;
+		scrollText(delta);
+		row = rows-1;
+		startY -= delta;
+	}
+	setTextXY(col,row);
+}
+
+static void drawFrom(uint16_t offset) {
+	setXYFromOffset(offset);
+	startY -= putText(buffer+offset);
+}
+
+static void clearCursor(void) {
+	setXYFromOffset(cursor);
+	setScrollMode(0);
+	if (cursor<length)
+		putChar(buffer[cursor]);
+	else
+		putChar(' ');
+	setScrollMode(1);
+}
+
+static void drawCursor(void) {
+	setXYFromOffset(cursor);
+	setScrollMode(0);
+	setTextReverse(1);
+	if (cursor<length) 
+		putChar(buffer[cursor]);
+	else
+		putChar(' ');
+	setTextReverse(0);
+	setScrollMode(1);
+}
+
+int getTextContinuable(char* _buffer, uint16_t maxSize, int timeoutTicks, char continued) {	
+	uint32_t endTime = 0;
+	
+	if (0<timeoutTicks) {
+		if (getVBLCounter()==(uint32_t)(-1))
+			patchVBL();
+		endTime = getVBLCounter() + timeoutTicks;
+	}
+	
+	if (maxSize == 0)
+		return -1;
+	else if (maxSize == 1) {
+		*_buffer = 0;
+		return 0;
+	}
+	
+	if (! continued) {
+		setTextReverse(0);
+		setScrollMode(1);
+		startX = getTextX();
+		startY = getTextY();
+		rows = getTextRows();
+		cols = getTextColumns();
+		buffer = _buffer;
+		cursor = length = strlen(_buffer);
+		char* p = buffer;
+		
+		while(*p) {
+			if (*p == '\n' || *p == '\r')
+				*p = ' ';
+			p++;
+		}
+		drawFrom(0);
+	}
+	drawCursor();
+	
+	while(1) {
+		while(!kbhit()) {
+			if (0 < timeoutTicks && endTime <= getVBLCounter()) {
+				clearCursor();
+				return ERROR_TIMEOUT;
+			}
+		}
+		char c = getch();
+		switch(c) {
+			case '\n':
+			case '\r':
+				clearCursor();
+				return length;
+			case KEYBOARD_BREAK:
+				clearCursor();
+				return -1;
+			case KEYBOARD_LEFT:
+				if (cursor > 0) {
+					clearCursor();
+					cursor--;
+					drawCursor();
+				}
+				break;
+			case KEYBOARD_RIGHT:
+				if (cursor < length) {
+					clearCursor();
+					cursor++;
+					drawCursor();
+				}
+				break;
+			case '\b':
+			case '\x7F':
+				if (cursor > 0) {
+					clearCursor();
+					if (cursor < length) 
+						memmove(buffer+cursor-1, buffer+cursor, length+1-cursor);
+					else
+						buffer[cursor-1] = 0;
+					cursor--;
+					length--;
+					drawFrom(cursor);
+					putChar(' ');
+					drawCursor();
+				}
+				break;
+			default:
+				if (length + 1 < maxSize - 1) {
+					clearCursor();
+					if (cursor < length)
+						memmove(buffer+cursor+1, buffer+cursor, length+1-cursor);
+					else
+						buffer[cursor+1] = 0;
+					buffer[cursor] = c;
+					cursor++;
+					length++;
+					drawFrom(cursor-1);
+					drawCursor();
+				}
+				break;
+		}
+	}
+}
 
 /* Translate in place all the escape characters in s.  */
 static void translate_special_chars(char *s)
@@ -206,10 +339,15 @@ static bool dumb_read_line(char *s, char *prompt, bool show_cursor,
 				dumb_show_prompt(show_cursor,
 					(timeout ? "tTD" : ")>}")[type]);
 		}
+		else {
+			short len = strlen(s);
+			if (len > 0 && s[len-1] == '\n')
+				s[len-1] = 0;
+		}
 
 		int n = getTextContinuable(s, INPUT_BUFFER_SIZE-2, timeout*6, continued);
 		if (n != ERROR_TIMEOUT) {
-			printf("\n");
+			putText("\n");
 			if (0 <= n) {
 				s[n] = '\n';
 				s[n+1] = 0;
@@ -276,10 +414,16 @@ static bool dumb_read_line(char *s, char *prompt, bool show_cursor,
 					current_page = next_page;
 					if (!*current_page)
 						break;
-					printf("HELP: Type <return> for more, or q <return> to stop: ");
-					dumb_getline(s);
-					if (!strcmp(s, "q\n"))
+					printf("HELP: Type <return> for more, or q to stop: ");
+					char c = getch();
+					if (c=='q') {
+						putChar(c);
+						putChar('\n');
 						break;
+					}
+					else {
+						putChar('\n');
+					}
 				}
 			}
 		} else if (!strcmp(command, "s")) {
@@ -305,39 +449,6 @@ static void dumb_read_misc_line(char *s, char *prompt)
 /* Similar.  Useful for using function key abbreviations.  */
 static char read_line_buffer[INPUT_BUFFER_SIZE];
 
-#ifdef USE_UTF8
-/* Convert UTF-8 encoded char starting at in[idx] to zchar (UCS-2) if
- * representable in 16 bits or '?' otherwise and return index to next
- * char of input array. */
-static int utf8_to_zchar(zchar *out, char *in, int idx)
-{
-	zchar ch;
-	int i;
-	if ((in[idx] & 0x80) == 0) {
-		ch = in[idx++];
-	} else if ((in[idx] & 0xe0) == 0xc0) {
-		ch = in[idx++] & 0x1f;
-		if ((in[idx] & 0xc0) != 0x80)
-			goto error;
-		ch = (ch << 6) | (in[idx++] & 0x3f);
-	} else if ((in[idx] & 0xf0) == 0xe0) {
-		ch = in[idx++] & 0xf;
-		for (i = 0; i < 2; i++) {
-			if ((in[idx] & 0xc0) != 0x80)
-				goto error;
-			ch = (ch << 6) | (in[idx++] & 0x3f);
-		}
-	} else {
-		/* Consume all subsequent continuation bytes. */
-		while ((in[++idx] & 0xc0) == 0x80)
-			;
-error:
-		ch = '?';
-	}
-	*out = ch;
-	return idx;
-} /* utf8_to_zchar */
-#endif
 
 
 // TODO: support show_cursor
@@ -348,6 +459,8 @@ zchar os_read_key (int timeout, bool show_cursor)
 	if (timeout) {
 		start_time = timeTenths();
 	}
+	
+	dumb_show_screen(false);
 	
 	while (! kbhit()) {
 		if (timeout) {
@@ -370,20 +483,10 @@ zchar os_read_line (int UNUSED (max), zchar *buf, int timeout, int UNUSED(width)
 	int terminator;
 	static bool timed_out_last_time;
 	int timed_out = 0;
-#ifdef USE_UTF8
-	int i, j, len;
-#endif
 
-	/* After timing out, discard any further input unless
-	 * we're continuing.  */
-	if (timed_out_last_time && !continued)
-		read_line_buffer[0] = '\0';
-
-	if (read_line_buffer[0] == '\0') {
-		timed_out = dumb_read_line(read_line_buffer, NULL, TRUE,
-			timeout * 100 / speed_100, buf[0] ? INPUT_LINE_CONTINUED : INPUT_LINE,
-			buf, continued);
-	} 
+	timed_out = dumb_read_line(buf, NULL, TRUE,
+		timeout * 100 / speed_100, buf[0] ? INPUT_LINE_CONTINUED : INPUT_LINE,
+		buf, continued);
 
 	if (timed_out) {
 		timed_out_last_time = TRUE;
@@ -391,7 +494,7 @@ zchar os_read_line (int UNUSED (max), zchar *buf, int timeout, int UNUSED(width)
 	}
 
 	/* find the terminating character.  */
-	for (p = read_line_buffer;; p++) {
+	for (p = buf;; p++) {
 		if (is_terminator(*p)) {
 			terminator = *p;
 			*p++ = '\0';
@@ -402,32 +505,18 @@ zchar os_read_line (int UNUSED (max), zchar *buf, int timeout, int UNUSED(width)
 	/* TODO: Truncate to width and max.  */
 
 	/* copy to screen */
-	dumb_display_user_input(read_line_buffer);
+//	dumb_display_user_input(read_line_buffer);
 
 	/* copy to the buffer and save the rest for next time.  */
-#ifndef USE_UTF8
-	strncat((char*) buf, (char *) read_line_buffer,
+	/*strncat((char*) buf, (char *) read_line_buffer,
 		INPUT_BUFFER_SIZE - strlen(read_line_buffer) - 1);
-#else
-	for (len = 0;; len++) {
-		if (!buf[len])
-			break;
-	}
-	j = 0;
-	for (i = len; i < INPUT_BUFFER_SIZE - 2; i++) {
-		if (!read_line_buffer[j])
-			break;
-		j = utf8_to_zchar(&buf[i], read_line_buffer, j);
-	}
-	buf[i] = 0;
-#endif
 	p = read_line_buffer + strlen(read_line_buffer) + 1;
-	memmove(read_line_buffer, p, strlen(p) + 1);
+	memmove(read_line_buffer, p, strlen(p) + 1); */
 
 	/* If there was just a newline after the terminating character,
 	 * don't save it.  */
-	if ((read_line_buffer[0] == '\r') && (read_line_buffer[1] == '\0'))
-		read_line_buffer[0] = '\0';
+//	if ((read_line_buffer[0] == '\r') && (read_line_buffer[1] == '\0'))
+//		read_line_buffer[0] = '\0';
 
 	timed_out_last_time = FALSE;
 	return terminator;
@@ -635,8 +724,15 @@ char *os_read_file_name (const char *default_name, int flag)
 void os_more_prompt (void)
 {
 	if (do_more_prompts) {
-		char buf[INPUT_BUFFER_SIZE];
-		dumb_read_misc_line(buf, "***MORE***");
+		dumb_show_screen(false);
+		uint16_t x,y;
+		x = getTextX();
+		y = getTextY();
+		putText("***MORE***");
+		getch();
+		setTextXY(x,y);
+		putText("          ");
+		setTextXY(x,y);
 	} else
 		dumb_elide_more_prompt();
 } /* os_more_prompt */
