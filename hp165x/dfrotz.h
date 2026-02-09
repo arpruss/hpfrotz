@@ -11,6 +11,8 @@
 #ifndef DUMB_DFROTZ_H
 #define DUMB_DFROTZ_H
 
+#include <hp165x.h>
+
 #include "../common/frotz.h"
 
 #ifndef NO_BASENAME
@@ -63,5 +65,8 @@ void dumb_set_picture_cell(int row, int col, zchar c);
 
 /* dumb-pic.c */
 bool dumb_init_pictures(void);
+
+#define FOREGROUND WRITE_WHITE
+#define BACKGROUND WRITE_BLACK
 
 #endif

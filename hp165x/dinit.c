@@ -95,9 +95,9 @@ void os_process_arguments(int _argc, char *_argv[])
 	char *format_orig = NULL;
 	
 	patchVBL();
-	*SCREEN_MEMORY_CONTROL = WRITE_BLACK;
+	*SCREEN_MEMORY_CONTROL = BACKGROUND;
 	fillScreen();
-	*SCREEN_MEMORY_CONTROL = WRITE_WHITE;
+	*SCREEN_MEMORY_CONTROL = FOREGROUND;
 	setTextColors(WRITE_WHITE,WRITE_BLACK);
 	setTextXY(0,0);
 	initKeyboard(1);

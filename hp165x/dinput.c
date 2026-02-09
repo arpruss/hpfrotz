@@ -37,15 +37,12 @@ static char runtime_usage[] =
 	"    \\help    Show this message.\n"
 	"    \\set     Show the current values of runtime settings.\n"
 	"    \\s       Show the current contents of the whole screen.\n"
-	"    \\d       Discard the part of the input before the cursor.\n"
+/* 	"    \\d       Discard the part of the input before the cursor.\n" */
 	"    \\wN      Advance clock N/10 seconds, possibly causing the current\n"
 	"                and subsequent inputs to timeout.\n"
 	"    \\w       Advance clock by the amount of real time since this input\n"
 	"                started (times the current speed factor).\n"
 	"    \\t       Advance clock just enough to timeout the current input\n"
-	"  Reverse-Video Display Method Settings:\n"
-	"    \\rn   none    \\rc   CAPS    \\rd   doublestrike    \\ru   underline\n"
-	"    \\rbC  show rv blanks as char C (orthogonal to above modes)\n"
 	"  Output Compression Settings:\n"
 	"    \\cn      none: show whole screen before every input.\n"
 	"    \\cm      max: show only lines that have new nonblank characters.\n"
@@ -96,16 +93,23 @@ static uint16_t rows;
 static char* buffer;
 static uint16_t cursor;
 static uint16_t length;
+static char singleLine;
 
 static void setXYFromOffset(uint16_t offset) {
 	uint16_t p = startX + offset;
 	uint16_t row = startY + p / cols;
 	uint16_t col = p % cols;
 	if (row >= rows) {
-		uint16_t delta = row - rows + 1;
-		scrollText(delta);
-		row = rows-1;
-		startY -= delta;
+		if (singleLine) {
+			row = rows-1;
+			col = cols-1;
+		}
+		else {
+			uint16_t delta = row - rows + 1;
+			scrollText(delta);
+			row = rows-1;
+			startY -= delta;
+		}
 	}
 	setTextXY(col,row);
 }
@@ -163,6 +167,7 @@ int getTextContinuable(char* _buffer, uint16_t maxSize, int timeoutTicks, char c
 		buffer = _buffer;
 		cursor = length = strlen(_buffer);
 		char* p = buffer;
+		singleLine = startX + maxSize - 1 <= cols;		
 		
 		while(*p) {
 			if (*p == '\n' || *p == '\r')
@@ -175,7 +180,7 @@ int getTextContinuable(char* _buffer, uint16_t maxSize, int timeoutTicks, char c
 	
 	while(1) {
 		while(!kbhit()) {
-			if (0 < timeoutTicks && endTime <= getVBLCounter()) {
+			if ((length == 0 || *buffer!='\\') && 0 < timeoutTicks && endTime <= getVBLCounter()) {
 				clearCursor();
 				return ERROR_TIMEOUT;
 			}
@@ -371,6 +376,7 @@ static bool dumb_read_line(char *s, char *prompt, bool show_cursor,
 		/* Remove the \ and the terminating newline.  */
 		command = s + 1;
 		command[strlen(command) - 1] = '\0';
+		*s = 0;
 
 		if (!strcmp(command, "t")) {
 			if (timeout) {
@@ -391,14 +397,14 @@ static bool dumb_read_line(char *s, char *prompt, bool show_cursor,
 				timeout -= elapsed;
 				start_time = now;
 			}
-		} else if (!strcmp(command, "d")) {
+/*		} else if (!strcmp(command, "d")) {
 			if (type != INPUT_LINE_CONTINUED)
 				fprintf(stderr, "DUMB-FROTZ: No input to discard\n");
 			else {
 				dumb_discard_old_input(strlen((char*) continued_line_chars));
 				continued_line_chars[0] = '\0';
 				type = INPUT_LINE;
-			}
+ 		} */
 		} else if (!strcmp(command, "help")) {
 			if (!do_more_prompts)
 				putText(runtime_usage);
@@ -431,7 +437,7 @@ static bool dumb_read_line(char *s, char *prompt, bool show_cursor,
     		} else if (!dumb_handle_setting(command, show_cursor, FALSE)) {
 			fprintf(stderr, "DUMB-FROTZ: unknown command: %s\n", s);
 			fprintf(stderr, "Enter \\help to see the list of commands\n");
-		}
+		} 
 	}
 } /* dumb_read_line */
 
@@ -596,7 +602,7 @@ char pick_file(char* name, char** extData, int numExts) {
 						strncpy(name, d.name, MAX_FILE_NAME + 1);
 						putText("Selected: ");
 						putText(d.name);
-						putText("\n");
+						putText(".\n");
 						return 1;
 					}
 					pos++;

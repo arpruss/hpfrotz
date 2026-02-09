@@ -87,16 +87,6 @@ static enum {
 static char *compression_names[] = {"NONE", "SPANS", "MAX"};
 static int hide_lines = 0;
 
-/* Reverse-video display styles.  */
-static enum {
-        RV_NONE,
-	RV_DOUBLESTRIKE,
-	RV_UNDERLINE,
-	RV_CAPS,
-} rv_mode = RV_NONE;
-static char *rv_names[] = {"NONE", "DOUBLESTRIKE", "UNDERLINE", "CAPS"};
-static char rv_blank_str[5] = {' ', 0, 0, 0, 0};
-
 
 /*
  * Local functions
@@ -363,31 +353,9 @@ static void show_cell_bbcode(cell_t cel)
 static void show_cell_normal(cell_t cel)
 {
 	if (cel.style & REVERSE_STYLE) {
-		if (cel.c == ' ')
-			printf("%s", rv_blank_str);
-		else {
-			switch (rv_mode) {
-			case RV_CAPS:
-				if (cel.c <= 0x7f) {
-					zputChar(toupper(cel.c));
-					break;
-				}
-				/* fall through */
-			case RV_NONE:
-				zputChar(cel.c);
-				break;
-			case RV_UNDERLINE:
-				putChar('_');
-				putChar('\b');
-				zputChar(cel.c);
-				break;
-			case RV_DOUBLESTRIKE:
-				zputChar(cel.c);
-				putChar('\b');
-				zputChar(cel.c);
-				break;
-			}
-		}
+		setTextReverse(1);
+		zputChar(cel.c);
+		setTextReverse(0);
 	}
 	else if (cel.style & PICTURE_STYLE)
 		zputChar(show_pictures ? cel.c : ' ');
@@ -420,7 +388,7 @@ static bool will_print_blank(cell_t c)
 	return (((c.style == PICTURE_STYLE) && !show_pictures)
 		|| ((c.c == ' ')
 		&& ((c.style != REVERSE_STYLE)
-		|| (*rv_blank_str == ' '))));
+		)));
 } /* will_print_blank */
 
 
@@ -1001,7 +969,6 @@ void dumb_elide_more_prompt(void)
 bool dumb_output_handle_setting(const char *setting, bool show_cursor,
 				bool startup)
 {
-	char *p;
 	int i;
 #ifdef USE_UTF8
 	unsigned char *q;
@@ -1035,31 +1002,6 @@ bool dumb_output_handle_setting(const char *setting, bool show_cursor,
 		}
 		printf("Compression mode %s, hiding top %d lines\n",
 		compression_names[compression_mode], hide_lines);
-	} else if (*setting == 'r') {
-		switch (setting[1]) {
-		case 'n': rv_mode = RV_NONE; break;
-		case 'o': rv_mode = RV_DOUBLESTRIKE; break;
-		case 'u': rv_mode = RV_UNDERLINE; break;
-		case 'c': rv_mode = RV_CAPS; break;
-		case 'b': strncpy(rv_blank_str, setting[2] ? &setting[2] : " ", 4); break;
-		default: return FALSE;
-		}
-#ifdef USE_UTF8
-		for (q = (unsigned char *)&rv_blank_str[1]; *q; q++)
-			if (*q < 0x80 || *q >= 0xc0 || (unsigned char)rv_blank_str[0] < 0x80)
-				*q = 0;
-#else
-		rv_blank_str[1] = 0;
-#endif
-		printf("Reverse-video mode %s, blanks reverse to '%s': ",
-			rv_names[rv_mode], rv_blank_str);
-
-		for (p = "sample reverse text"; *p; p++)
-			show_cell(make_cell(REVERSE_STYLE, DEFAULT_DUMB_COLOUR, DEFAULT_DUMB_COLOUR, *p));
-		putChar('\n');
-		for (i = 0; i < screen_cells; i++)
-			screen_changes[i] = (screen_data[i].style == REVERSE_STYLE);
-		dumb_show_screen(show_cursor);
 	} else if (!strcmp(setting, "set")) {
 		printf("Compression Mode %s, hiding top %d lines\n",
 			compression_names[compression_mode], hide_lines);
@@ -1068,10 +1010,6 @@ bool dumb_output_handle_setting(const char *setting, bool show_cursor,
 		os_beep(1); os_beep(2);
 		printf("Line Numbering %s\n", show_line_numbers ? "ON" : "OFF");
 		printf("Line-Type display %s\n", show_line_types ? "ON" : "OFF");
-		printf("Reverse-Video mode %s, Blanks reverse to '%s': ",
-			rv_names[rv_mode], rv_blank_str);
-		for (p = "sample reverse text"; *p; p++)
-			show_cell(make_cell(REVERSE_STYLE, DEFAULT_DUMB_COLOUR, DEFAULT_DUMB_COLOUR, *p));
 		putChar('\n');
 	} else
 		return FALSE;
