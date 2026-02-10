@@ -68,8 +68,6 @@ For more options and explanations, please read the manual page.\n\n\
 While running, enter \"\\help\" to list the runtime escape sequences.\n"
 
 
-static int user_text_width = 74;
-static int user_text_height = 24;
 static int user_random_seed = -1;
 static bool plain_ascii = FALSE;
 
@@ -94,15 +92,6 @@ void os_process_arguments(int _argc, char *_argv[])
 	char *p = NULL;
 	char *format_orig = NULL;
 	
-	patchVBL();
-	*SCREEN_MEMORY_CONTROL = BACKGROUND;
-	fillScreen();
-	*SCREEN_MEMORY_CONTROL = FOREGROUND;
-	setTextColors(WRITE_WHITE,WRITE_BLACK);
-	setTextXY(0,0);
-	initKeyboard(1);
-//	if (getText(filename,MAX_FILENAME_LENGTH)<0)
-//		reload();
 	static char story[MAX_FILE_NAME+1];
 	if (!pick_file(story,storyExts,sizeof(storyExts)/sizeof(*storyExts))) {
 		putText("Please enter a filename: ");
@@ -123,7 +112,7 @@ void os_process_arguments(int _argc, char *_argv[])
 	quiet_mode = FALSE;
 	/* Parse the options */
 	do {
-		c = zgetopt(argc, argv, "aAf:h:iI:L:mn:oOpPqr:R:s:S:tTu:vw:xZ:");
+		c = zgetopt(argc, argv, "aAf:iI:L:mn:oOpPqr:R:s:S:tTu:vxZ:");
 		switch(c) {
 		case 'a':
 			f_setup.attribute_assignment = 1;
@@ -150,9 +139,6 @@ void os_process_arguments(int _argc, char *_argv[])
 				(strcmp(zoptarg, "normal") == 0)) {
 			} else
 				f_setup.format = FORMAT_UNKNOWN;
-			break;
-		case 'h':
-			user_text_height = atoi(zoptarg);
 			break;
 		case 'i':
 			f_setup.ignore_errors = 1;
@@ -212,9 +198,6 @@ void os_process_arguments(int _argc, char *_argv[])
 		case 'v':
 			print_version();
 			os_quit(EXIT_SUCCESS);
-			break;
-		case 'w':
-			user_text_width = atoi(zoptarg);
 			break;
 		case 'x':
 			f_setup.expand_abbreviations = 1;
@@ -332,8 +315,8 @@ void os_init_screen(void)
 	if (z_header.version >= V5 && f_setup.undo_slots == 0)
 		z_header.flags &= ~UNDO_FLAG;
 
-	z_header.screen_rows = user_text_height;
-	z_header.screen_cols = user_text_width;
+	z_header.screen_rows = getTextRows();
+	z_header.screen_cols = getTextColumns();
 
 	/* Use the ms-dos interpreter number for v6, because that's the
 	 * kind of graphics files we understand.  Otherwise, use DEC.  */
@@ -499,7 +482,15 @@ int os_storyfile_tell(FILE * fp)
 
 void os_init_setup(void)
 {
-	/* Nothing here */
+	patchVBL();
+	setScreenHeight(MAX_SCREEN_HEIGHT);
+	*SCREEN_MEMORY_CONTROL = BACKGROUND;
+	fillScreen();
+	*SCREEN_MEMORY_CONTROL = FOREGROUND;
+	setTextColors(WRITE_WHITE,WRITE_BLACK);
+	setTextXY(0,0);
+	initKeyboard(1);
+	printf("height %d rows %d\n", SCREEN_HEIGHT, getTextRows());
 } /* os_init_setup */
 
 
