@@ -483,14 +483,12 @@ int os_storyfile_tell(FILE * fp)
 void os_init_setup(void)
 {
 	patchVBL();
-	setScreenHeight(MAX_SCREEN_HEIGHT);
 	*SCREEN_MEMORY_CONTROL = BACKGROUND;
 	fillScreen();
 	*SCREEN_MEMORY_CONTROL = FOREGROUND;
 	setTextColors(WRITE_WHITE,WRITE_BLACK);
 	setTextXY(0,0);
 	initKeyboard(1);
-	printf("height %d rows %d\n", SCREEN_HEIGHT, getTextRows());
 } /* os_init_setup */
 
 

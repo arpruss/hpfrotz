@@ -30,16 +30,21 @@ static bool show_line_numbers = FALSE;
 static bool show_line_types = FALSE;
 static bool show_pictures = TRUE;
 static bool visual_bell = TRUE;
-static bool plain_ascii = FALSE;
 
-static char latin1_to_ascii[] =
-	"    !   c   L   >o< Y   |   S   ''  C   a   <<  not -   R   _   "
-	"^0  +/- ^2  ^3  '   my  P   .   ,   ^1  o   >>  1/4 1/2 3/4 ?   "
-	"A   A   A   A   Ae  A   AE  C   E   E   E   E   I   I   I   I   "
-	"Th  N   O   O   O   O   Oe  *   O   U   U   U   Ue  Y   Th  ss  "
-	"a   a   a   a   ae  a   ae  c   e   e   e   e   i   i   i   i   "
-	"th  n   o   o   o   o   oe  :   o   u   u   u   ue  y   th  y   "
-;
+char latin1_to_ibm[] = {
+	0x20, 0xad, 0xbd, 0x9c, 0xcf, 0xbe, 0xdd, 0xf5,
+	0xf9, 0xb8, 0xa6, 0xae, 0xaa, 0xf0, 0xa9, 0xee,
+	0xf8, 0xf1, 0xfd, 0xfc, 0xef, 0xe6, 0xf4, 0xfa,
+	0xf7, 0xfb, 0xa7, 0xaf, 0xac, 0xab, 0xf3, 0xa8,
+	0xb7, 0xb5, 0xb6, 0xc7, 0x8e, 0x8f, 0x92, 0x80,
+	0xd4, 0x90, 0xd2, 0xd3, 0xde, 0xd6, 0xd7, 0xd8,
+	0xd1, 0xa5, 0xe3, 0xe0, 0xe2, 0xe5, 0x99, 0x9e,
+	0x9d, 0xeb, 0xe9, 0xea, 0x9a, 0xed, 0xe8, 0xe1,
+	0x85, 0xa0, 0x83, 0xc6, 0x84, 0x86, 0x91, 0x87,
+	0x8a, 0x82, 0x88, 0x89, 0x8d, 0xa1, 0x8c, 0x8b,
+	0xd0, 0xa4, 0x95, 0xa2, 0x93, 0xe4, 0x94, 0xf6,
+	0x9b, 0x97, 0xa3, 0x96, 0x81, 0xec, 0xe7, 0x98
+};
 
 static char frotz_to_dumb [256];
 
@@ -91,24 +96,7 @@ static int hide_lines = 0;
 /*
  * Local functions
  */
-#ifdef USE_UTF8
-static void zputChar(zchar);
-void zputChar(zchar c)
-{
-	if(c > 0x7ff) {
-		putChar(0xe0 | ((c >> 12) & 0xf));
-		putChar(0x80 | ((c >> 6) & 0x3f));
-		putChar(0x80 | (c & 0x3f));
-	} else if(c > 0x7f) {
-		putChar(0xc0 | ((c >> 6) & 0x1f));
-		putChar(0x80 | (c & 0x3f));
-	} else {
-		putChar(c);
-	}
-} /* zputChar */
-#else
 #define zputChar(x) putChar(x)
-#endif
 
 
 /* if val is '0' or '1', set *var accordingly, else toggle it.  */
@@ -352,6 +340,9 @@ static void show_cell_bbcode(cell_t cel)
 /* Print a cell to stdout without using formatting codes.  */
 static void show_cell_normal(cell_t cel)
 {
+	
+	
+	
 	if (cel.style & REVERSE_STYLE) {
 		setTextReverse(1);
 		zputChar(cel.c);
@@ -530,13 +521,7 @@ static void dumb_copy_cell(int dest_row, int dest_col,
 void os_display_char (zchar c)
 {
 	if (c >= ZC_LATIN1_MIN) {
-		if (plain_ascii) {
-			char *ptr = latin1_to_ascii + 4 * (c - ZC_LATIN1_MIN);
-			do
-				dumb_display_char(*ptr++);
-			while (*ptr != ' ');
-		} else
-			dumb_display_char(c);
+		dumb_display_char(latin1_to_ibm[c - ZC_LATIN1_MIN]);
 	} else if (c >= 32 && c <= 126) {
 		dumb_display_char(c);
 	} else if (c == ZC_GAP) {
@@ -652,10 +637,6 @@ int os_check_unicode(int UNUSED (font), zchar UNUSED (c))
 
 int os_char_width (zchar z)
 {
-	if (plain_ascii && z >= ZC_LATIN1_MIN) {
-		char *p = latin1_to_ascii + 4 * (z - ZC_LATIN1_MIN);
-		return strchr(p, ' ') - p;
-	}
 	return 1;
 } /* os_char_width */
 
