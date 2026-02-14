@@ -31,48 +31,6 @@
 
 extern f_setup_t f_setup;
 
-static char runtime_usage[] =
-	"DUMB-FROTZ runtime help:\n"
-	"  General Commands:\n"
-	"    \\help    Show this message.\n"
-	"    \\set     Show the current values of runtime settings.\n"
-	"    \\s       Show the current contents of the whole screen.\n"
-/* 	"    \\d       Discard the part of the input before the cursor.\n" */
-	"    \\wN      Advance clock N/10 seconds, possibly causing the current\n"
-	"                and subsequent inputs to timeout.\n"
-	"    \\w       Advance clock by the amount of real time since this input\n"
-	"                started (times the current speed factor).\n"
-	"    \\t       Advance clock just enough to timeout the current input\n"
-	"  Output Compression Settings:\n"
-	"    \\cn      none: show whole screen before every input.\n"
-	"    \\cm      max: show only lines that have new nonblank characters.\n"
-	"    \\cs      spans: like max, but emit a blank line between each span of\n"
-	"                screen lines shown.\n"
-	"    \\chN     Hide top N lines (orthogonal to above modes).\n"
-	"  Misc Settings:\n"
-	"    \\sfX     Set speed factor to X.  (0 = never timeout automatically).\n"
-	"    \\mp      Toggle use of MORE prompts\n"
-	"    \\pr      Toggle display of line numbers.\n"
-	"    \\lt      Toggle display of the line type identification chars.\n"
-	"    \\vb      Toggle visual bell.\n"
-	"    \\pb      Toggle display of picture outline boxes.\n"
-	"    (Toggle commands can be followed by a 1 or 0 to set value ON or OFF.)\n"
-	"  Character Escapes:\n"
-	"    \\\\  backslash    \\#  backspace    \\[  escape    \\_  return\n"
-	"    \\< \\> \\^ \\.  cursor motion        \\1 ..\\0  f1..f10\n"
-	"    \\D ..\\X   Standard Frotz hotkeys.  Use \\H (help) to see the list.\n"
-	"  Line Type Identification Characters:\n"
-	"    Input lines:\n"
-	"      untimed  timed\n"
-	"      >        T      A regular line-oriented input\n"
-	"      )        t      A single-character input\n"
-	"      }        D      A line input with some input before the cursor.\n"
-	"                         (Use \\d to discard it.)\n"
-	"    Output lines:\n"
-	"      ]     Output line that contains the cursor.\n"
-	"      .     A blank line emitted as part of span compression.\n"
-	"            (blank) Any other output line.\n"
-;
 
 static int speed_100 = 100;
 
@@ -94,6 +52,9 @@ static char* buffer;
 static uint16_t cursor;
 static uint16_t length;
 static char singleLine;
+
+#define INPUT_STOP (-1)
+#define INPUT_ESC  (-2)
 
 static void setXYFromOffset(uint16_t offset) {
 	uint16_t p = startX + offset;
@@ -141,6 +102,28 @@ static void drawCursor(void) {
 	setScrollMode(1);
 }
 
+static void leftWord(void) {
+	if (cursor <= 0)
+		return;
+	clearCursor();
+	while(cursor > 0 && buffer[cursor-1] == ' ')
+		cursor--;
+	while(cursor > 0 && buffer[cursor-1] != ' ')
+		cursor --;
+	drawCursor();
+}
+
+static void rightWord(void) {
+	if (cursor >= length)
+		return;
+	clearCursor();
+	while(cursor + 1 < length && buffer[cursor] == ' ')
+		cursor++;
+	while(cursor + 1 < length && buffer[cursor] != ' ')
+		cursor++;
+	drawCursor();
+}
+
 int getTextContinuable(char* _buffer, uint16_t maxSize, int timeoutTicks, char continued) {	
 	uint32_t endTime = 0;
 	
@@ -185,15 +168,42 @@ int getTextContinuable(char* _buffer, uint16_t maxSize, int timeoutTicks, char c
 				return ERROR_TIMEOUT;
 			}
 		}
-		char c = getch();
+		uint8_t c = getch();
 		switch(c) {
 			case '\n':
 			case '\r':
 				clearCursor();
 				return length;
 			case KEYBOARD_BREAK:
+			case 27:
 				clearCursor();
-				return -1;
+				setScrollMode(0);
+				setXYFromOffset(0);
+				while(length-->0) {
+					putChar(' ');
+				}
+				setXYFromOffset(0);
+				length = 0;
+				cursor = 0;
+				*buffer = 0;
+				setScrollMode(1);
+				return c == 27 ? INPUT_ESC : INPUT_STOP;  
+			case KEYBOARD_CTRL_LEFT:
+				leftWord();
+				break;
+			case KEYBOARD_CTRL_RIGHT:
+				rightWord();
+				break;
+			case KEYBOARD_HOME:
+				clearCursor();
+				cursor = 0;
+				drawCursor();
+				break;
+			case KEYBOARD_END:
+				clearCursor();
+				cursor = length;
+				drawCursor();
+				break;
 			case KEYBOARD_LEFT:
 				if (cursor > 0) {
 					clearCursor();
@@ -306,34 +316,16 @@ static void toggle(bool *var, char val)
 /* Handle input-related user settings and call dumb_output_handle_setting.  */
 bool dumb_handle_setting(const char *setting, bool show_cursor, bool startup)
 {
-	if (!strncmp(setting, "sf", 2)) {
-		speed_100 = atoi(&setting[2]);
-		printf("Speed Factor %d\n", speed_100);
-	} else if (!strncmp(setting, "mp", 2)) {
-		toggle(&do_more_prompts, setting[2]);
-		printf("More prompts %s\n", do_more_prompts ? "ON" : "OFF");
-	} else {
-		if (!strcmp(setting, "set")) {
-			printf("Speed Factor %d\n", speed_100);
-			printf("More Prompts %s\n",
- 				do_more_prompts ? "ON" : "OFF");
-		}
-		return dumb_output_handle_setting(setting, show_cursor, startup);
-	}
 	return TRUE;
 } /* dumb_handle_setting */
 
 
-/* Read a line, processing commands (lines that start with a backslash
- * (that isn't the start of a special character)), and write the
- * first non-command to s.
+/* Read a line to s.
  * Return true if timed-out.  */
-static bool dumb_read_line(char *s, char *prompt, bool show_cursor,
+static int16_t hp_read_line(zchar *s, char *prompt, bool show_cursor,
 			   int timeout, enum input_type type,
 			   zchar *continued_line_chars, bool continued)
 {
-	dumb_show_screen(show_cursor);
-
 	time_t start_time = timeTenths();
 
 	for (;;) {
@@ -351,117 +343,28 @@ static bool dumb_read_line(char *s, char *prompt, bool show_cursor,
 				s[len-1] = 0;
 		}
 
-		int n = getTextContinuable(s, INPUT_BUFFER_SIZE-2, timeout*6, continued);
-		if (n != ERROR_TIMEOUT) {
-#ifndef HP			
-			putText("\n");
-#endif			
-			if (0 <= n) {
-				s[n] = '\n';
-				s[n+1] = 0;
-			}
-			else if (-1 == n) {				
-				strcpy(s, "quit\n");
-#ifdef HP
-				putText("quit");
-#else				
-				putText(s);
-#endif			
-			}
+		int16_t n = getTextContinuable((char*)s, INPUT_BUFFER_SIZE-2, timeout*6, continued);
+		if (0 <= n) {
+			s[n] = '\n';
+			s[n+1] = 0;
 		}
 
-		if ((s[0] != '\\') || ((s[1] != '\0') && !islower(s[1]))) {
-			/* Is not a command line.  */
-			translate_special_chars(s);
-			if (n == ERROR_TIMEOUT) {
-				return TRUE;
-			}
-			return FALSE;
-		}
-		/* Commands.  */
+		translate_special_chars(s);
 
-		/* Remove the \ and the terminating newline.  */
-		command = s + 1;
-		command[strlen(command) - 1] = '\0';
-		*s = 0;
-
-		if (!strcmp(command, "t")) {
-			if (timeout) {
-				time_ahead = 0;
-				s[0] = '\0';
-				return TRUE;
-			}
-		} else if (*command == 'w') {
-			if (timeout) {
-				int elapsed = atoi(&command[1]);
-				long now = timeTenths();
-				if (elapsed == 0)
-					elapsed = (now - start_time) * speed_100 / 100;
-				if (elapsed >= timeout) {
-					s[0] = '\0';
-					return TRUE;
-				}
-				timeout -= elapsed;
-				start_time = now;
-			}
-/*		} else if (!strcmp(command, "d")) {
-			if (type != INPUT_LINE_CONTINUED)
-				fprintf(stderr, "DUMB-FROTZ: No input to discard\n");
-			else {
-				dumb_discard_old_input(strlen((char*) continued_line_chars));
-				continued_line_chars[0] = '\0';
-				type = INPUT_LINE;
- 		} */
-		} else if (!strcmp(command, "help")) {
-			if (!do_more_prompts)
-				putText(runtime_usage);
-			else {
-				char *current_page, *next_page;
-				current_page = next_page = runtime_usage;
-				for (;;) {
-					int i;
-					for (i = 0; (i < z_header.screen_rows - 2) && *next_page; i++)
-						next_page = strchr(next_page, '\n') + 1;
-					/* next_page - current_page is width */
-					printf("%.*s", (int) (next_page - current_page), current_page);
-					current_page = next_page;
-					if (!*current_page)
-						break;
-					printf("HELP: Type <return> for more, or q to stop: ");
-					char c = getch();
-					if (c=='q') {
-						putChar(c);
-						putChar('\n');
-						break;
-					}
-					else {
-						putChar('\n');
-					}
-				}
-			}
-		} else if (!strcmp(command, "s")) {
-			dumb_dump_screen();
-    		} else if (!dumb_handle_setting(command, show_cursor, FALSE)) {
-			fprintf(stderr, "DUMB-FROTZ: unknown command: %s\n", s);
-			fprintf(stderr, "Enter \\help to see the list of commands\n");
-		} 
+		return n;
 	}
-} /* dumb_read_line */
+} /* hp_read_line */
 
 
 /* Read a line that is not part of z-machine input (more prompts and
  * filename requests).  */
-static void dumb_read_misc_line(char *s, char *prompt)
+static int16_t hp_read_misc_line(char *s, char *prompt)
 {
-	dumb_read_line(s, prompt, 0, 0, 0, 0, 0);
+	int16_t result = hp_read_line(s, prompt, 0, 0, 0, 0, 0);
 	/* Remove terminating newline */
 	s[strlen(s) - 1] = '\0';
-} /* dumb_read_misc_line */
-
-
-/* Similar.  Useful for using function key abbreviations.  */
-static char read_line_buffer[INPUT_BUFFER_SIZE];
-
+	return result;
+} /* hp_read_misc_line */
 
 
 // TODO: support show_cursor
@@ -495,15 +398,19 @@ zchar os_read_line (int UNUSED (max), zchar *buf, int timeout, int UNUSED(width)
 	char *p;
 	int terminator;
 	static bool timed_out_last_time;
-	int timed_out = 0;
 
-	timed_out = dumb_read_line(buf, NULL, TRUE,
+	int16_t result = hp_read_line(buf, NULL, TRUE,
 		timeout * 100 / speed_100, buf[0] ? INPUT_LINE_CONTINUED : INPUT_LINE,
 		buf, continued);
-
-	if (timed_out) {
+		
+	if (result == ERROR_TIMEOUT) {
 		timed_out_last_time = TRUE;
 		return ZC_TIME_OUT;
+	}
+	else if (result == INPUT_STOP) {
+		printf("QUIT\n");
+		strcpy(buf, "QUIT");
+		return 13;
 	}
 
 	/* find the terminating character.  */
@@ -514,28 +421,12 @@ zchar os_read_line (int UNUSED (max), zchar *buf, int timeout, int UNUSED(width)
 			break;
 		}
 	}
-
-	/* TODO: Truncate to width and max.  */
-
-	/* copy to screen */
-//	dumb_display_user_input(read_line_buffer);
-
-	/* copy to the buffer and save the rest for next time.  */
-	/*strncat((char*) buf, (char *) read_line_buffer,
-		INPUT_BUFFER_SIZE - strlen(read_line_buffer) - 1);
-	p = read_line_buffer + strlen(read_line_buffer) + 1;
-	memmove(read_line_buffer, p, strlen(p) + 1); */
-
-	/* If there was just a newline after the terminating character,
-	 * don't save it.  */
-//	if ((read_line_buffer[0] == '\r') && (read_line_buffer[1] == '\0'))
-//		read_line_buffer[0] = '\0';
-
+	
 	timed_out_last_time = FALSE;
 	return terminator;
 } /* os_read_line */
 
-char right_type(DirEntry_t* d, char** extList, int numExts) {
+static char right_type(DirEntry_t* d, char** extList, int numExts) {
 	if (d->type == 0)
 		return 0;
 	short nameLen = strlen(d->name);
@@ -621,61 +512,8 @@ char pick_file(char* name, char** extData, int numExts) {
 	return 0;
 }
 
-#define WRITE_OVERLAY_FOREGROUND 0b001000001001
-#define WRITE_OVERLAY_BACKGROUND 0b000000001001
-#define WRITE_OVERLAY_ERASE 	 0b011000001001
 
-#define WIN_X1 10
-#define WIN_Y1 4
-#define WIN_X2 70
-#define WIN_Y2 22
-
-uint16_t savedX;
-uint16_t savedY;
-
-void setWindow() {
-	savedX = getTextX();
-	savedY = getTextY();
-	*SCREEN_MEMORY_CONTROL = WRITE_OVERLAY_BACKGROUND;
-	uint16_t h = getFontHeight();
-	fillRectangle(WIN_X1*FONT_WIDTH,WIN_Y1*h,WIN_X2*FONT_WIDTH,WIN_Y2*h);
-	setTextWindow(WIN_X1,WIN_Y1,WIN_X2-WIN_X1,WIN_Y2-WIN_Y1);
-	setTextColors(WRITE_OVERLAY_FOREGROUND,WRITE_OVERLAY_BACKGROUND);
-	setTextXY(0,0);
-}
-
-void clearWindow() {
-	uint16_t h = getFontHeight();
-	*SCREEN_MEMORY_CONTROL = WRITE_OVERLAY_ERASE;
-	fillRectangle(WIN_X1*FONT_WIDTH,WIN_Y1*h,WIN_X2*FONT_WIDTH,WIN_Y2*h);
-	setTextWindow(0,0,0,0);
-	setTextColors(FOREGROUND,BACKGROUND);
-	setTextXY(savedX,savedY);
-}
-
-/*
- * os_read_file_name
- *
- * Return the name of a file. Flag can be one of:
- *
- *    FILE_SAVE      - Save game file
- *    FILE_RESTORE   - Restore game file
- *    FILE_SCRIPT    - Transcript file
- *    FILE_RECORD    - Command file for recording
- *    FILE_PLAYBACK  - Command file for playback
- *    FILE_SAVE_AUX  - Save auxiliary ("preferred settings") file
- *    FILE_LOAD_AUX  - Load auxiliary ("preferred settings") file
- *    FILE_NO_PROMPT - Return file without prompting the user
- *
- * The length of the file name is limited by MAX_FILE_NAME. Ideally
- * an interpreter should open a file requester to ask for the file
- * name. If it is unable to do that then this function should call
- * print_string and read_string to ask for a file name.
- *
- * Return value is NULL if there was a problem.
- */
-char *os_read_file_name (const char *default_name, int flag)
-{
+char *hp_read_file_name (const char *default_name, int flag) {
 	static char file_name[FILENAME_MAX + 1];
 	char prompt[INPUT_BUFFER_SIZE];
 
@@ -687,21 +525,17 @@ char *os_read_file_name (const char *default_name, int flag)
 	char *ext;
 	bool freebuf = FALSE;
 
-	setWindow();
-
 	/* If we're restoring a game before the interpreter starts,
  	 * our filename is already provided.  Just go ahead silently.
 	 */
 	if (f_setup.restore_mode) {
 		/* Caller always strdups */
-		clearWindow();
 		return (char*)default_name;
 	} else if (flag == FILE_NO_PROMPT) {
 		ext = strrchr(default_name, '.');
 		if (strncmp(ext, EXT_AUX, 4)) {
 			os_warn("Blocked unprompted access of %s. Should only be %s files.", default_name, EXT_AUX);
 			free(ext);
-			clearWindow();
 			return NULL;
 		}
 		free(ext);
@@ -710,13 +544,14 @@ char *os_read_file_name (const char *default_name, int flag)
 		if (flag == FILE_RESTORE || flag == FILE_LOAD_AUX) {
 			char *ext = (flag == FILE_RESTORE) ? EXT_SAVE : EXT_AUX;
 			if (pick_file(file_name, &ext,1)) {
-				clearWindow();
 				return file_name;
 			}
 		}
+		
 		sprintf(prompt, "Please enter a filename [%s]: ", default_name);
 
-		dumb_read_misc_line(fullpath, prompt);
+		if (hp_read_misc_line(fullpath, prompt) < 0)
+			return NULL;
 
 		/* If using default filename... */
 		freebuf = TRUE;
@@ -729,7 +564,6 @@ char *os_read_file_name (const char *default_name, int flag)
 			printf("Filename too long\n");
 			delayTicks(30);
 			free(buf);
-			clearWindow();
 			return NULL;
 		}
 	}
@@ -766,32 +600,45 @@ char *os_read_file_name (const char *default_name, int flag)
 	if ((flag == FILE_SAVE || flag == FILE_SAVE_AUX || flag == FILE_RECORD)
 		&& ((fp = fopen(file_name, "rb")) != NULL)) {
 		fclose (fp);
-		dumb_read_misc_line(fullpath, "Overwrite existing file? ");
+		if (hp_read_misc_line(fullpath, "Overwrite existing file? ") < 0)
+			return NULL;
 		if (tolower(fullpath[0]) != 'y') {
-			clearWindow();
 			return NULL;
 		}
 	}
-		clearWindow();
 	return file_name;
+}
+
+/*
+ * os_read_file_name
+ *
+ * Return the name of a file. Flag can be one of:
+ *
+ *    FILE_SAVE      - Save game file
+ *    FILE_RESTORE   - Restore game file
+ *    FILE_SCRIPT    - Transcript file
+ *    FILE_RECORD    - Command file for recording
+ *    FILE_PLAYBACK  - Command file for playback
+ *    FILE_SAVE_AUX  - Save auxiliary ("preferred settings") file
+ *    FILE_LOAD_AUX  - Load auxiliary ("preferred settings") file
+ *    FILE_NO_PROMPT - Return file without prompting the user
+ *
+ * The length of the file name is limited by MAX_FILE_NAME. Ideally
+ * an interpreter should open a file requester to ask for the file
+ * name. If it is unable to do that then this function should call
+ * print_string and read_string to ask for a file name.
+ *
+ * Return value is NULL if there was a problem.
+ */
+char *os_read_file_name (const char *default_name, int flag)
+{
+	hp_set_window();
+	char* p = hp_read_file_name(default_name, flag);
+	hp_clear_window();
+
+	return p;
 } /* os_read_file_name */
 
-
-void os_more_prompt (void)
-{
-	if (do_more_prompts) {
-		dumb_show_screen(false);
-		uint16_t x,y;
-		x = getTextX();
-		y = getTextY();
-		putText("***MORE***");
-		getch();
-		setTextXY(x,y);
-		putText("          ");
-		setTextXY(x,y);
-	} else
-		dumb_elide_more_prompt();
-} /* os_more_prompt */
 
 
 void dumb_init_input(void)

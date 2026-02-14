@@ -29,8 +29,43 @@
 
 #include "dfrotz.h"
 
-static int current_style = 0;
+#define WRITE_OVERLAY_GRAY       0b110000000001
+#define WRITE_OVERLAY_FOREGROUND 0b101000000001
+#define WRITE_OVERLAY_BACKGROUND 0b100000000001
+#define WRITE_OVERLAY_ERASE 	 0b111000000001
 
+#define WIN_X1 10
+#define WIN_Y1 4
+#define WIN_X2 70
+#define WIN_Y2 22
+
+static uint16_t savedX;
+static uint16_t savedY;
+
+void hp_set_window(void) {
+	savedX = getTextX();
+	savedY = getTextY();
+	uint16_t h = getFontHeight();
+	*SCREEN_MEMORY_CONTROL = WRITE_OVERLAY_GRAY;
+	frameRectangle(WIN_X1*FONT_WIDTH,WIN_Y1*h,WIN_X2*FONT_WIDTH,WIN_Y2*h,8);
+	*SCREEN_MEMORY_CONTROL = WRITE_OVERLAY_BACKGROUND;
+	fillRectangle(WIN_X1*FONT_WIDTH,WIN_Y1*h,WIN_X2*FONT_WIDTH,WIN_Y2*h);
+	setTextWindow(WIN_X1,WIN_Y1,WIN_X2,WIN_Y2);
+	setTextColors(WRITE_OVERLAY_FOREGROUND,WRITE_OVERLAY_BACKGROUND);
+	setTextXY(0,0);
+}
+
+void hp_clear_window() {
+	uint16_t h = getFontHeight();
+	*SCREEN_MEMORY_CONTROL = WRITE_OVERLAY_ERASE;
+	fillRectangle(WIN_X1*FONT_WIDTH-8,WIN_Y1*h-8,WIN_X2*FONT_WIDTH+8,WIN_Y2*h+8);
+	setTextWindow(0,0,0,0);
+	setTextColors(FOREGROUND,BACKGROUND);
+	setTextXY(savedX,savedY);
+}
+
+static int current_style = 0;
+static int current_font = 0;
 static int current_fg = 1;
 static int current_bg = 0;
 
@@ -226,10 +261,42 @@ int os_get_text_style(void)
 	return current_style;
 } /* os_get_text_style */
 
+void adjust_style(void) {
+	setTextReverse((current_style & (REVERSE_STYLE | BOLDFACE_STYLE | EMPHASIS_STYLE)) != 0);
+}
+
+void os_more_prompt(void)
+{
+	/* Save text font and style */
+	int saved_font = current_font;
+	int saved_style = current_style;
+
+	/* Choose plain text style */
+	current_font = TEXT_FONT;
+	current_style = 0;
+
+	adjust_style();
+
+	/* Wait until the user presses a key */
+	uint16_t saved_x = getTextX();
+	uint16_t saved_y = getTextY();
+	os_display_string((zchar *) "[MORE]");
+	os_read_key(0, TRUE);
+	setTextXY(saved_x,saved_y);
+	os_display_string((zchar*) "      ");
+	setTextXY(saved_x,saved_y);
+
+	/* Restore text font and style */
+	current_font = saved_font;
+	current_style = saved_style;
+
+	adjust_style();
+} /* os_more_prompt */
+
 void os_set_text_style(int x)
 {
 	current_style = x;
-	setTextReverse((x & (REVERSE_STYLE | BOLDFACE_STYLE | EMPHASIS_STYLE)) != 0);
+	adjust_style();
 } /* os_set_text_style */
 
 int os_from_true_colour(zword UNUSED (colour))
@@ -251,7 +318,11 @@ zword os_to_true_colour(int UNUSED (index))
 	return 0;
 } /* os_to_true_colour */
 
-void os_set_font (int UNUSED (x)) {}
+void os_set_font(int new_font)
+{
+	current_font = new_font;
+} /* os_set_font */
+
 
 void dumb_show_prompt(bool show_cursor, char line_type) {}
 
@@ -273,10 +344,13 @@ void dumb_init_output(void) {
 		z_header.flags &= ~SOUND_FLAG;
 	}
 
+	z_header.font_width = 1; 
+	z_header.font_height = 1;
 	z_header.screen_height = z_header.screen_rows;
 	z_header.screen_width = z_header.screen_cols;
 	z_header.default_foreground = WHITE_COLOUR;
 	z_header.default_background = BLACK_COLOUR;
+	os_erase_area(1, 1, z_header.screen_rows, z_header.screen_cols, -2);
 }	
 
 bool dumb_output_handle_setting(const char *setting, bool show_cursor,

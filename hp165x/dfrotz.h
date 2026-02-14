@@ -63,6 +63,9 @@ void dumb_discard_old_input(int num_chars);
 void dumb_elide_more_prompt(void);
 void dumb_set_picture_cell(int row, int col, zchar c);
 
+void hp_set_window(void);
+void hp_clear_window(void);
+
 /* dumb-pic.c */
 bool dumb_init_pictures(void);
 

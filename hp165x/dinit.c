@@ -28,7 +28,6 @@
 extern f_setup_t f_setup;
 extern z_header_t z_header;
 
-static void usage(void);
 static void print_version(void);
 char pick_file(char* name, char** extList, int numExts);
 static char* storyExts[] = {
@@ -42,30 +41,6 @@ static char* storyExts[] = {
 	".z7",
 	".z8"	
 };
-
-
-#define INFORMATION "\
-An interpreter for all Infocom and other Z-Machine games.\n\
-\n\
-Syntax: dfrotz [options] story-file [blorb file]\n\
-  -a   watch attribute setting    \t -q   quiet mode (no startup messages)\n\
-  -A   watch attribute testing    \t -r <option> Set runtime options\n\
-  -f <type> type of format codes  \t -R <path> restricted read/write\n\
-  -h # screen height              \t -s # random number seed value\n\
-  -i   ignore fatal errors        \t -S # transcript width\n\
-  -I # interpreter number         \t -t   set Tandy bit\n\
-  -o   watch object movement      \t -T   start transcript on startup\n\
-  -O   watch object locating      \t -u # slots for multiple undo\n\
-  -L <file> load this save file   \t -v   show version information\n\
-  -m   turn off MORE prompts      \t -w # screen width\n\
-  -n <file> set transcript filename\t -x   expand abbreviations g/x/z\n\
-  -p   plain ASCII output only    \t -Z # error checking (see below)\n\
-  -P   alter piracy opcode\n"
-
-#define INFO2 "\
-Error checking: 0 none, 1 first only (default), 2 all, 3 exit after any error.\n\
-For more options and explanations, please read the manual page.\n\n\
-While running, enter \"\\help\" to list the runtime escape sequences.\n"
 
 
 static int user_random_seed = -1;
@@ -93,9 +68,8 @@ void os_process_arguments(int _argc, char *_argv[])
 	char *format_orig = NULL;
 	
 	static char story[MAX_FILE_NAME+1];
-	setWindow();
+	hp_set_window();
 	if (!pick_file(story,storyExts,sizeof(storyExts)/sizeof(*storyExts))) {
-		clearWindow();
 		putText("Please enter a filename: ");
 		short n = getText(story, MAX_FILE_NAME+1);
 		putText("\n");
@@ -104,10 +78,8 @@ void os_process_arguments(int _argc, char *_argv[])
 			os_quit(0);
 		}
 	}
-	else {
-		clearWindow();
-	}
-	
+	hp_clear_window();
+		
 	int argc = 2;
 	char* argv[2] = {"hpfrotz", story};
 
@@ -115,150 +87,8 @@ void os_process_arguments(int _argc, char *_argv[])
 
 	do_more_prompts = TRUE;
 	quiet_mode = FALSE;
-	/* Parse the options */
-	do {
-		c = zgetopt(argc, argv, "aAf:iI:L:mn:oOpPqr:R:s:S:tTu:vxZ:");
-		switch(c) {
-		case 'a':
-			f_setup.attribute_assignment = 1;
-			break;
-		case 'A':
-			f_setup.attribute_testing = 1;
-			break;
-		case 'f':
-#ifdef DISABLE_FORMATS
-			f_setup.format = FORMAT_DISABLED;
-			break;
-#endif
-			f_setup.format = FORMAT_NORMAL;
-			format_orig = strdup(zoptarg);
-			for (num = 0; zoptarg[num] != 0; num++)
-				zoptarg[num] = tolower((int) zoptarg[num]);
-			if (strcmp(zoptarg, "irc") == 0) {
-				f_setup.format = FORMAT_IRC;
-			} else if (strcmp(zoptarg, "ansi") == 0) {
-				f_setup.format = FORMAT_ANSI;
-			} else if (strcmp(zoptarg, "bbcode") == 0) {
-				f_setup.format = FORMAT_BBCODE;
-			} else if ((strcmp(zoptarg, "none") == 0) ||
-				(strcmp(zoptarg, "normal") == 0)) {
-			} else
-				f_setup.format = FORMAT_UNKNOWN;
-			break;
-		case 'i':
-			f_setup.ignore_errors = 1;
-			break;
-		case 'I':
-			f_setup.interpreter_number = atoi(zoptarg);
-			break;
-		case 'L':
-			f_setup.restore_mode = 1;
-			f_setup.tmp_save_name = strdup(zoptarg);
-			break;
-		case 'm':
-			do_more_prompts = FALSE;
-			break;
-#ifndef NO_SCRIPT
-		case 'n':
-			f_setup.script_name_override = strdup(zoptarg);
-			break;
-#endif			
-		case 'o':
-			f_setup.object_movement = 1;
-			break;
-		case 'O':
-			f_setup.object_locating = 1;
-			break;
-		case 'P':
-			f_setup.piracy = 1;
-			break;
-		case 'p':
-			plain_ascii = 1;
-			break;
-		case 'q':
-			quiet_mode = 1;
-			break;
-		case 'r':
-			dumb_handle_setting(zoptarg, FALSE, TRUE);
-			break;
-		case 'R':
-			f_setup.restricted_path = strndup(zoptarg, PATH_MAX);
-			break;
-		case 's':
-			user_random_seed = atoi(zoptarg);
-			break;
-		case 'S':
-			f_setup.script_cols = atoi(zoptarg);
-			break;
-		case 't':
-			f_setup.tandy = 1;
-			break;
-		case 'T':
-			printf("Starting transcript from the beginning.\n");
-			f_setup.script_now = 1;
-			break;
-		case 'u':
-			f_setup.undo_slots = atoi(zoptarg);
-			break;
-		case 'v':
-			print_version();
-			os_quit(EXIT_SUCCESS);
-			break;
-		case 'x':
-			f_setup.expand_abbreviations = 1;
-			break;
-		case 'Z':
-			f_setup.err_report_mode = atoi(zoptarg);
-			if ((f_setup.err_report_mode < ERR_REPORT_NEVER) ||
-			 	(f_setup.err_report_mode > ERR_REPORT_FATAL))
-				f_setup.err_report_mode =
-					ERR_DEFAULT_REPORT_MODE;
-			break;
-		case '?':
-			usage();
-			os_quit(EXIT_FAILURE);
-			break;
-		}
-	} while (c != EOF);
 
-	if (argv[zoptind] == NULL) {
-		usage();
-		os_quit(EXIT_SUCCESS);
-	}
-
-	if (!quiet_mode) {
-		switch (f_setup.format) {
-		case FORMAT_NORMAL:
-			printf("Using normal formatting.\n");
-			break;
-		case FORMAT_IRC:
-			printf("Using IRC formatting.\n");
-			break;
-		case FORMAT_ANSI:
-			printf("Using ANSI formatting.\n");
-			break;
-		case FORMAT_BBCODE:
-			printf("Using Discourse BBCode formatting.\n");
-			f_setup.format = FORMAT_BBCODE;
-			break;
-		case FORMAT_UNKNOWN:
-			printf("Unknown formatting \"%s\".  Using normal formatting instead.\n", format_orig);
-			break;
-		case FORMAT_DISABLED:
-			printf("Format selection disabled at compile time.\n");
-			break;
-		default:
-			printf("Something else happened with format selection.\n");
-			printf("This should not happen.\n");
-			break;
-		}
-
-		if (f_setup.script_now)
-			printf("Starting transcript from the beginning.\n");
-
-	}
-	if (f_setup.format == FORMAT_UNKNOWN || f_setup.format == FORMAT_DISABLED)
-		f_setup.format = FORMAT_NORMAL;
+	f_setup.format = FORMAT_NORMAL;
 
 	/* Save the story file name */
 	f_setup.story_file = strdup(argv[zoptind]);
@@ -268,8 +98,10 @@ void os_process_arguments(int _argc, char *_argv[])
 #else
 	f_setup.story_name = strdup(basename(argv[zoptind]));
 #endif
+#ifndef NO_BLORB
 	if (argv[zoptind+1] != NULL)
 		f_setup.blorb_file = strdup(argv[zoptind+1]);
+#endif
 
 	if (!quiet_mode) {
 		printf("Loading %s.\n", f_setup.story_file);
@@ -485,6 +317,13 @@ int os_storyfile_tell(FILE * fp)
 #endif
 } /* os_storyfile_tell */
 
+static void intro(void)
+{
+	printf("FROTZ V%s - HP165x interface.\n", VERSION);
+	return;
+} /* usage */
+
+
 void os_init_setup(void)
 {
 	patchVBL();
@@ -494,16 +333,8 @@ void os_init_setup(void)
 	setTextColors(WRITE_WHITE,WRITE_BLACK);
 	setTextXY(0,0);
 	initKeyboard(1);
+	intro();
 } /* os_init_setup */
-
-
-static void usage(void)
-{
-	printf("FROTZ V%s - Dumb interface.\n", VERSION);
-	putText(INFORMATION);
-	putText(INFO2);
-	return;
-} /* usage */
 
 
 static void print_version(void)
