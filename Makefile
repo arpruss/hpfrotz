@@ -51,7 +51,7 @@ OPTS=-DNO_BLORB -DNO_BASENAME -DNO_SCRIPT -DFILENAME_MAX=10 -DMAX_FILE_NAME=10 \
 	$(RES)
 
 CFLAGS=-m$(CPU) $(OPTS) --save-temps -Wno-unknown-pragmas -Wno-builtin-declaration-mismatch -Wall -Wextra -static -I../libhp165x -I../../m68k_bare_metal/include -I. -msoft-float -MMD -MP -O99
-LFLAGS=-L../libhp165x -L../../m68k_bare_metal/libmetal --script=platform.ld -lhp165x640x392 -lmetal-$(CPU) -Map=output.map
+LFLAGS=-gc-sections -L../libhp165x -L../../m68k_bare_metal/libmetal --script=platform.ld -lhp165x640x392 -lmetal-$(CPU) -Map=output.map
 
 OBJS=$(patsubst %.c,$(BUILDDIR)/%.c.o,$(SRCS))
 OBJS:=$(patsubst %.S,$(BUILDDIR)/%.S.o,$(OBJS))
