@@ -44,7 +44,7 @@ CC=$(PREFIX)-gcc
 LD=$(PREFIX)-ld
 OBJCOPY=$(PREFIX)-objcopy
 OBJDUMP=$(PREFIX)-objdump
-RES=-DDEFAULT_SCREEN_HEIGHT=392 -DSCREEN_WIDTH=640 -DHP
+RES=-DDEFAULT_SCREEN_HEIGHT=392 -DSCREEN_WIDTH=640 
 OPTS=-DNO_BLORB -DNO_BASENAME -DNO_SCRIPT -DFILENAME_MAX=10 -DMAX_FILE_NAME=10 \
 	-Dfseek=myfseek -DFILE=MYFILE -Dftell=myftell -Dfgetc=myfgetc -Dfopen=myfopen -Dfclose=myfclose \
 	-Dfwrite=myfwrite -Dfread=myfread -Dferror=myferror -Dfputc=myfputc \
