@@ -93,7 +93,9 @@ void os_process_arguments(int _argc, char *_argv[])
 	char *format_orig = NULL;
 	
 	static char story[MAX_FILE_NAME+1];
+	setWindow();
 	if (!pick_file(story,storyExts,sizeof(storyExts)/sizeof(*storyExts))) {
+		clearWindow();
 		putText("Please enter a filename: ");
 		short n = getText(story, MAX_FILE_NAME+1);
 		putText("\n");
@@ -101,6 +103,9 @@ void os_process_arguments(int _argc, char *_argv[])
 			putText("Goodbye!");
 			os_quit(0);
 		}
+	}
+	else {
+		clearWindow();
 	}
 	
 	int argc = 2;

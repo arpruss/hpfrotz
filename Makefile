@@ -18,8 +18,8 @@
 SRCS=common/buffer.c common/err.c common/fastmem.c common/files.c common/getopt.c common/hotkey.c common/input.c \
 common/main.c common/math.c common/missing.c common/object.c common/process.c common/quetzal.c \
 common/random.c common/redirect.c common/screen.c common/sound.c common/stream.c common/table.c \
-common/text.c common/variable.c hp165x/dblorb.c hp165x/dinit.c hp165x/dinput.c hp165x/doutput.c hp165x/dpic.c \
-hp165x/fakefile.c 
+common/text.c common/variable.c hp165x/dblorb.c hp165x/dinit.c hp165x/dpic.c \
+hp165x/fakefile.c hp165x/hpscrn.c hp165x/hpinput.c # hp165x/doutput.c hp165x/dinput.c 
 
 
 # Specify the CPU type that you are targeting your build towards.
@@ -44,7 +44,7 @@ CC=$(PREFIX)-gcc
 LD=$(PREFIX)-ld
 OBJCOPY=$(PREFIX)-objcopy
 OBJDUMP=$(PREFIX)-objdump
-RES=-DDEFAULT_SCREEN_HEIGHT=392 -DSCREEN_WIDTH=640
+RES=-DDEFAULT_SCREEN_HEIGHT=392 -DSCREEN_WIDTH=640 -DHP
 OPTS=-DNO_BLORB -DNO_BASENAME -DNO_SCRIPT -DFILENAME_MAX=10 -DMAX_FILE_NAME=10 \
 	-Dfseek=myfseek -DFILE=MYFILE -Dftell=myftell -Dfgetc=myfgetc -Dfopen=myfopen -Dfclose=myfclose \
 	-Dfwrite=myfwrite -Dfread=myfread -Dferror=myferror -Dfputc=myfputc \

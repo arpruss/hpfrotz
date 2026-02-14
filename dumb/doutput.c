@@ -587,8 +587,6 @@ void os_display_string (const zchar *s)
 {
 	zchar c;
 	
-printf("ARP:display_string:[%s]",s);
-
 	while ((c = *s++) != 0) {
 		if (c == ZC_NEW_FONT)
 			s++;
@@ -648,6 +646,7 @@ int os_font_data(int font, int *height, int *width)
 
 void os_set_colour (int newfg, int newbg)
 {
+	printf("[%d %d]", newfg, newbg);
 	current_fg = frotz_to_dumb[newfg];
 	current_bg = frotz_to_dumb[newbg];
 } /* os_set_colour */
@@ -754,6 +753,7 @@ int os_get_text_style(void)
  */
 void os_set_text_style(int x)
 {
+	printf("<%d>",x);
 	current_style = x;
 } /* os_set_text_style */
 

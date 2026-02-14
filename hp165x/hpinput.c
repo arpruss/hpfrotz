@@ -621,6 +621,38 @@ char pick_file(char* name, char** extData, int numExts) {
 	return 0;
 }
 
+#define WRITE_OVERLAY_FOREGROUND 0b001000001001
+#define WRITE_OVERLAY_BACKGROUND 0b000000001001
+#define WRITE_OVERLAY_ERASE 	 0b011000001001
+
+#define WIN_X1 10
+#define WIN_Y1 4
+#define WIN_X2 70
+#define WIN_Y2 22
+
+uint16_t savedX;
+uint16_t savedY;
+
+void setWindow() {
+	savedX = getTextX();
+	savedY = getTextY();
+	*SCREEN_MEMORY_CONTROL = WRITE_OVERLAY_BACKGROUND;
+	uint16_t h = getFontHeight();
+	fillRectangle(WIN_X1*FONT_WIDTH,WIN_Y1*h,WIN_X2*FONT_WIDTH,WIN_Y2*h);
+	setTextWindow(WIN_X1,WIN_Y1,WIN_X2-WIN_X1,WIN_Y2-WIN_Y1);
+	setTextColors(WRITE_OVERLAY_FOREGROUND,WRITE_OVERLAY_BACKGROUND);
+	setTextXY(0,0);
+}
+
+void clearWindow() {
+	uint16_t h = getFontHeight();
+	*SCREEN_MEMORY_CONTROL = WRITE_OVERLAY_ERASE;
+	fillRectangle(WIN_X1*FONT_WIDTH,WIN_Y1*h,WIN_X2*FONT_WIDTH,WIN_Y2*h);
+	setTextWindow(0,0,0,0);
+	setTextColors(FOREGROUND,BACKGROUND);
+	setTextXY(savedX,savedY);
+}
+
 /*
  * os_read_file_name
  *
@@ -655,17 +687,21 @@ char *os_read_file_name (const char *default_name, int flag)
 	char *ext;
 	bool freebuf = FALSE;
 
+	setWindow();
+
 	/* If we're restoring a game before the interpreter starts,
  	 * our filename is already provided.  Just go ahead silently.
 	 */
 	if (f_setup.restore_mode) {
 		/* Caller always strdups */
+		clearWindow();
 		return (char*)default_name;
 	} else if (flag == FILE_NO_PROMPT) {
 		ext = strrchr(default_name, '.');
 		if (strncmp(ext, EXT_AUX, 4)) {
 			os_warn("Blocked unprompted access of %s. Should only be %s files.", default_name, EXT_AUX);
 			free(ext);
+			clearWindow();
 			return NULL;
 		}
 		free(ext);
@@ -673,8 +709,10 @@ char *os_read_file_name (const char *default_name, int flag)
 	} else {
 		if (flag == FILE_RESTORE || flag == FILE_LOAD_AUX) {
 			char *ext = (flag == FILE_RESTORE) ? EXT_SAVE : EXT_AUX;
-			if (pick_file(file_name, &ext,1))
+			if (pick_file(file_name, &ext,1)) {
+				clearWindow();
 				return file_name;
+			}
 		}
 		sprintf(prompt, "Please enter a filename [%s]: ", default_name);
 
@@ -689,7 +727,9 @@ char *os_read_file_name (const char *default_name, int flag)
 
 		if (strlen(buf) > MAX_FILE_NAME) {
 			printf("Filename too long\n");
+			delayTicks(30);
 			free(buf);
+			clearWindow();
 			return NULL;
 		}
 	}
@@ -727,9 +767,12 @@ char *os_read_file_name (const char *default_name, int flag)
 		&& ((fp = fopen(file_name, "rb")) != NULL)) {
 		fclose (fp);
 		dumb_read_misc_line(fullpath, "Overwrite existing file? ");
-		if (tolower(fullpath[0]) != 'y')
+		if (tolower(fullpath[0]) != 'y') {
+			clearWindow();
 			return NULL;
+		}
 	}
+		clearWindow();
 	return file_name;
 } /* os_read_file_name */
 
