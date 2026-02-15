@@ -2,7 +2,6 @@
 // remove extra newline in input
 
 /*
- * owscreen.c - DOS interface, screen manipulation
  *
  * This file is part of Frotz.
  *
@@ -27,7 +26,7 @@
 #include <assert.h>
 #include <stdio.h>
 
-#include "dfrotz.h"
+#include "hpfrotz.h"
 
 #define WRITE_OVERLAY_GRAY       0b110000000001
 #define WRITE_OVERLAY_FOREGROUND 0b101000000001
@@ -324,15 +323,7 @@ void os_set_font(int new_font)
 } /* os_set_font */
 
 
-void dumb_show_prompt(bool show_cursor, char line_type) {}
-
-void dumb_show_screen(bool show_cursor) {}
-
-void dumb_dump_screen(void) {}
-
-void dumb_elide_more_prompt(void) {}
-
-void dumb_init_output(void) {
+void hp_init_output(void) {
 //	z_header.config |= CONFIG_COLOUR | CONFIG_BOLDFACE | CONFIG_EMPHASIS;
 
 	if (z_header.version == V3) {
@@ -353,5 +344,6 @@ void dumb_init_output(void) {
 	os_erase_area(1, 1, z_header.screen_rows, z_header.screen_cols, -2);
 }	
 
-bool dumb_output_handle_setting(const char *setting, bool show_cursor,
-				bool startup) { return false; }
+bool os_picture_data(int num, int *height, int *width){return FALSE;}
+void os_draw_picture (int num, int row, int col){}
+int os_peek_colour (void) {return BLACK_COLOUR; }

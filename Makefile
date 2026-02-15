@@ -18,8 +18,8 @@
 SRCS=common/buffer.c common/err.c common/fastmem.c common/files.c common/getopt.c common/hotkey.c common/input.c \
 common/main.c common/math.c common/missing.c common/object.c common/process.c common/quetzal.c \
 common/random.c common/redirect.c common/screen.c common/sound.c common/stream.c common/table.c \
-common/text.c common/variable.c hp165x/dblorb.c hp165x/dinit.c hp165x/dpic.c \
-hp165x/fakefile.c hp165x/hpscrn.c hp165x/hpinput.c # hp165x/doutput.c hp165x/dinput.c 
+common/text.c common/variable.c hp165x/hpinit.c \
+hp165x/fakefile.c hp165x/hpscreen.c hp165x/hpinput.c
 
 
 # Specify the CPU type that you are targeting your build towards.

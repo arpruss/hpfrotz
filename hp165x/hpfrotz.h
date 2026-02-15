@@ -8,8 +8,8 @@
  * Any use permitted provided this notice stays intact.
  */
 
-#ifndef DUMB_DFROTZ_H
-#define DUMB_DFROTZ_H
+#ifndef HP_FROTZ_H
+#define HP_FROTZ_H
 
 #include <hp165x.h>
 
@@ -41,18 +41,16 @@
 /* from ../common/setup.h */
 extern f_setup_t f_setup;
 
-extern bool do_more_prompts;
 extern bool quiet_mode;
 
 /* From input.c.  */
 bool is_terminator (zchar);
 
 /* dumb-input.c */
-bool dumb_handle_setting(const char *setting, bool show_cursor, bool startup);
-void dumb_init_input(void);
+void hp_init_input(void);
 
 /* dumb-output.c */
-void dumb_init_output(void);
+void hp_init_output(void);
 bool dumb_output_handle_setting(const char *setting, bool show_cursor,
 				bool startup);
 void dumb_show_screen(bool show_cursor);

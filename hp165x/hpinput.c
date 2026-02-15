@@ -1,5 +1,5 @@
 /*
- * dinput.c - Dumb interface, input functions
+ * dinput.c - HP152B/1653B interface, input functions
  *
  * This file is part of Frotz.
  *
@@ -24,17 +24,20 @@
 #include <assert.h>
 #include <stdio.h>
 
-#include "dfrotz.h"
+#include "hpfrotz.h"
 
 #define MAX_PICK_FILES 36
 #define PICK_FILES_PER_LINE 4
 
 extern f_setup_t f_setup;
 
-#define MAX_HISTORY 16
+#define HISTORY_BUFFER_SIZE 2048
 uint16_t historyCursor;
+uint16_t historyCursorOffset;
+uint16_t historyLength;
+uint16_t historyLastOffset;
 uint16_t numInHistory;
-zchar history[MAX_HISTORY][INPUT_BUFFER_SIZE];
+zchar history[HISTORY_BUFFER_SIZE];
 
 static int speed_100 = 100;
 
@@ -44,7 +47,7 @@ enum input_type {
 	INPUT_LINE_CONTINUED,
 };
 
-int getTextContinuable(char* _buffer, uint16_t maxSize, int timeoutTicks, char continued);
+int getTextContinuable(char* _buffer, uint16_t _maxSize, int timeoutTicks, char continued);
 char pick_file(char* name, char** extData, int numExts);
 long timeTenths(void);
 
@@ -56,6 +59,7 @@ static char* buffer;
 static uint16_t cursor;
 static uint16_t length;
 static char singleLine;
+static uint16_t maxSize;
 
 #define INPUT_STOP (-1)
 #define INPUT_ESC  (-2)
@@ -79,6 +83,25 @@ static void setXYFromOffset(uint16_t offset) {
 	setTextXY(col,row);
 }
 
+static void prepareHistory(void) {
+	if (historyLength + INPUT_BUFFER_SIZE > HISTORY_BUFFER_SIZE) {
+		/* remove items from history */
+		zchar* q = history + ((historyLength + INPUT_BUFFER_SIZE) - HISTORY_BUFFER_SIZE);
+		zchar* p = history;
+		do {
+			p += strlen((char*)p)+1;
+			numInHistory--;
+		} while(p<q);
+		uint16_t delta = p-history;
+		historyLength -= delta; 
+		memmove(history, p, historyLength);
+	}
+	numInHistory++;
+	historyCursor = numInHistory-1;
+	historyLastOffset = historyCursorOffset = historyLength;
+	history[historyLength] = 0;
+}
+
 static void drawFrom(uint16_t offset) {
 	setXYFromOffset(offset);
 	startY -= putText(buffer+offset);
@@ -100,6 +123,8 @@ static void drawCursor(void) {
 	setTextReverse(1);
 	if (cursor<length) 
 		putChar(buffer[cursor]);
+	else if (getTextX() == cols-1 && cursor == length)
+		putChar(buffer[cursor-1]);
 	else
 		putChar(' ');
 	setTextReverse(0);
@@ -128,12 +153,11 @@ static void rightWord(void) {
 	drawCursor();
 }
 
-static void loadHistoryEntry(uint16_t i) {
+static void loadHistoryEntry(zchar* p) {
 	uint16_t oldLength = length;
 	clearCursor();
 	setScrollMode(0);
-	historyCursor = i;
-	strncpy(buffer, history[i], INPUT_BUFFER_SIZE);
+	strncpy(buffer, (char*)p, INPUT_BUFFER_SIZE);
 	buffer[INPUT_BUFFER_SIZE-1] = 0;
 	length = strlen(buffer);
 	cursor = length;
@@ -143,7 +167,20 @@ static void loadHistoryEntry(uint16_t i) {
 	drawCursor();		
 }
 
-int getTextContinuable(char* _buffer, uint16_t maxSize, int timeoutTicks, char continued) {	
+static void clearBuffer(void) {
+	clearCursor();
+	setXYFromOffset(0);
+	while(length-->0) {
+		putChar(' ');
+	}
+	setXYFromOffset(0);
+	length = 0;
+	cursor = 0;
+	*buffer = 0;
+	drawCursor();
+}
+
+int getTextContinuable(char* _buffer, uint16_t _maxSize, int timeoutTicks, char continued) {	
 	uint32_t endTime = 0;
 	
 	if (0<timeoutTicks) {
@@ -152,32 +189,28 @@ int getTextContinuable(char* _buffer, uint16_t maxSize, int timeoutTicks, char c
 		endTime = getVBLCounter() + timeoutTicks;
 	}
 	
-	if (maxSize == 0)
+	if (_maxSize == 0)
 		return -1;
-	else if (maxSize == 1) {
+	else if (_maxSize == 1) {
 		*_buffer = 0;
 		return 0;
 	}
 	
 	if (! continued) {
-		historyCursor = 0;
-		if (numInHistory>0) {
-			if (numInHistory >= MAX_HISTORY)
-				numInHistory = MAX_HISTORY - 1;
-			memmove(&(history[1]),&(history[0]),numInHistory*sizeof(history[0]));
-		}
-		numInHistory++;
-		history[0][0] = 0;
+		prepareHistory();
 		setTextReverse(0);
 		setScrollMode(1);
 		startX = getTextX();
 		startY = getTextY();
 		rows = getTextRows();
 		cols = getTextColumns();
+		maxSize = cols - startX + 1;
+		if (maxSize > _maxSize)
+			maxSize = _maxSize;
 		buffer = _buffer;
 		cursor = length = strlen(_buffer);
 		char* p = buffer;
-		singleLine = startX + maxSize - 1 <= cols;		
+		singleLine = true; // startX + maxSize - 1 <= cols;		
 		
 		while(*p) {
 			if (*p == '\n' || *p == '\r')
@@ -200,44 +233,50 @@ int getTextContinuable(char* _buffer, uint16_t maxSize, int timeoutTicks, char c
 			case '\n':
 			case '\r':
 				clearCursor();
-				strncpy(history[0], buffer, sizeof(history[0]));
-				history[0][INPUT_BUFFER_SIZE-1]=0;
+				memcpy(history + historyLastOffset, buffer, length + 1);
+				historyLength += length + 1;
 				return length;
 			case KEYBOARD_BREAK:
 			case 27:
-				clearCursor();
-				setScrollMode(0);
-				setXYFromOffset(0);
-				while(length-->0) {
-					putChar(' ');
+				clearBuffer();
+				if (c == KEYBOARD_BREAK) {
+					numInHistory--;
+					*buffer++ = ZC_HKEY_QUIT;
+					*buffer = 0;
+					clearCursor();
+					return 1;
 				}
-				setXYFromOffset(0);
-				length = 0;
-				cursor = 0;
-				*buffer = 0;
-				setScrollMode(1);
-				numInHistory--;
-				if (numInHistory > 0)
-					memmove(&(history[0]),&(history[1]),numInHistory*sizeof(history[0]));
-				return c == 27 ? INPUT_ESC : INPUT_STOP;  
+				break;
+				
 			case KEYBOARD_UP:
-				if (strcmp(history[historyCursor], buffer)) { // commmit changed history entry to history
-					strncpy(history[0], buffer, INPUT_BUFFER_SIZE);
-					history[0][INPUT_BUFFER_SIZE-1] = 0;
-					historyCursor = 0;
+				if (*buffer && strcmp((char*)history+historyCursorOffset, buffer)) { // commmit changed history entry to history
+					strncpy((char*)history+historyLastOffset, buffer, INPUT_BUFFER_SIZE);
+					historyCursorOffset = historyLastOffset;
+					historyCursor = numInHistory-1;
 				}
-				if (historyCursor + 1 < numInHistory) {
-					loadHistoryEntry(historyCursor+1);
+				if (0 < historyCursor) {
+					zchar* p = history + historyCursorOffset - 2;
+					while (p >= history) {
+						if (*p == 0)
+							break;
+						p--;
+					}
+					p++;
+					historyCursor--;
+					historyCursorOffset = p-history;
+					loadHistoryEntry(p);
 				}
 				break;
 			case KEYBOARD_DOWN:
-				if (strcmp(history[historyCursor], buffer)) { // commmit changed history entry to history
-					strncpy(history[0], buffer, INPUT_BUFFER_SIZE);
-					history[0][INPUT_BUFFER_SIZE-1] = 0;
-					historyCursor = 0;
+				if (*buffer && strcmp((char*)history+historyCursorOffset, buffer)) { // commmit changed history entry to history
+					strncpy((char*)history+historyLastOffset, buffer, INPUT_BUFFER_SIZE);
+					historyCursorOffset = historyLastOffset;
+					historyCursor = numInHistory-1;
 				}
-				if (0 < historyCursor) {
-					loadHistoryEntry(historyCursor-1);
+				if (historyCursor + 1 < numInHistory) {
+					historyCursor++;
+					historyCursorOffset += strlen((char*)history+historyCursorOffset) + 1;
+					loadHistoryEntry(history + historyCursorOffset);
 				}
 				break;
 			case KEYBOARD_CTRL_LEFT:
@@ -271,7 +310,6 @@ int getTextContinuable(char* _buffer, uint16_t maxSize, int timeoutTicks, char c
 				}
 				break;
 			case '\b':
-			case '\x7F':
 				if (cursor > 0) {
 					clearCursor();
 					if (cursor < length) 
@@ -285,6 +323,7 @@ int getTextContinuable(char* _buffer, uint16_t maxSize, int timeoutTicks, char c
 					drawCursor();
 				}
 				break;
+			case '\x7F':
 			case _CTRL('g'):
 				if (cursor < length) {
 					clearCursor();
@@ -298,8 +337,8 @@ int getTextContinuable(char* _buffer, uint16_t maxSize, int timeoutTicks, char c
 					drawCursor();
 				}
 				break;
-			default:
-				if (length + 1 < maxSize - 1) {
+			default: 
+				if (length + 1 < maxSize) {
 					clearCursor();
 					if (cursor < length)
 						memmove(buffer+cursor+1, buffer+cursor, length+1-cursor);
@@ -317,9 +356,9 @@ int getTextContinuable(char* _buffer, uint16_t maxSize, int timeoutTicks, char c
 }
 
 /* Translate in place all the escape characters in s.  */
-static void translate_special_chars(char *s)
+static void translate_special_chars(zchar *s)
 {
-	char *src = s, *dest = s;
+	zchar *src = s, *dest = s;
 	while (*src)
 		switch(*src++) {
 		default: *dest++ = src[-1]; break;
@@ -352,14 +391,9 @@ static void translate_special_chars(char *s)
 			case '7': *dest++ = ZC_FKEY_F7; break;
 			case '8': *dest++ = ZC_FKEY_F8; break;
 			case '9': *dest++ = ZC_FKEY_F9; break;
-#ifdef TOPS20
-			case '0': *dest++ = (char) (ZC_FKEY_F10 & 0xff); break;
-#else
 			case '0': *dest++ = ZC_FKEY_F10; break;
-#endif
 			default:
-				fprintf(stderr, "DUMB-FROTZ: unknown escape char: %c\n", src[-1]);
-				fprintf(stderr, "Enter \\help to see the list\n");
+				break;
 			}
 		}
 	*dest = '\0';
@@ -367,31 +401,19 @@ static void translate_special_chars(char *s)
 
 
 
-/* Handle input-related user settings and call dumb_output_handle_setting.  */
-bool dumb_handle_setting(const char *setting, bool show_cursor, bool startup)
-{
-	return TRUE;
-} /* dumb_handle_setting */
-
-
 /* Read a line to s.
  * Return true if timed-out.  */
 static int16_t hp_read_line(zchar *s, char *prompt, bool show_cursor,
 			   int timeout, enum input_type type,
-			   zchar *continued_line_chars, bool continued)
+			   bool continued)
 {
-	time_t start_time = timeTenths();
-
 	for (;;) {
 		if (!continued) {
 			if (prompt)
 				putText(prompt);
-			else
-				dumb_show_prompt(show_cursor,
-					(timeout ? "tTD" : ")>}")[type]);
 		}
 		else {
-			short len = strlen(s);
+			short len = strlen((char*)s);
 			if (len > 0 && s[len-1] == '\n')
 				s[len-1] = 0;
 		}
@@ -413,7 +435,7 @@ static int16_t hp_read_line(zchar *s, char *prompt, bool show_cursor,
  * filename requests).  */
 static int16_t hp_read_misc_line(char *s, char *prompt)
 {
-	int16_t result = hp_read_line(s, prompt, 0, 0, 0, 0, 0);
+	int16_t result = hp_read_line((zchar*)s, prompt, 0, 0, 0, 0);
 	/* Remove terminating newline */
 	s[strlen(s) - 1] = '\0';
 	return result;
@@ -428,8 +450,6 @@ zchar os_read_key (int timeout, bool show_cursor)
 	if (timeout) {
 		start_time = timeTenths();
 	}
-	
-	dumb_show_screen(false);
 	
 	while (! kbhit()) {
 		if (timeout) {
@@ -448,20 +468,15 @@ zchar os_read_key (int timeout, bool show_cursor)
 
 zchar os_read_line (int UNUSED (max), zchar *buf, int timeout, int UNUSED(width), int continued)
 {
-	char *p;
+	zchar *p;
 	int terminator;
 
 	int16_t result = hp_read_line(buf, NULL, TRUE,
 		timeout * 100 / speed_100, buf[0] ? INPUT_LINE_CONTINUED : INPUT_LINE,
-		buf, continued);
+		continued);
 		
 	if (result == ERROR_TIMEOUT) {
 		return ZC_TIME_OUT;
-	}
-	else if (result == INPUT_STOP) {
-		printf("QUIT\n");
-		strcpy(buf, "QUIT");
-		return 13;
 	}
 
 	/* find the terminating character.  */
@@ -690,7 +705,7 @@ char *os_read_file_name (const char *default_name, int flag)
 
 
 
-void dumb_init_input(void)
+void hp_init_input(void)
 {
 	initKeyboard(1);
 	if ((z_header.version >= V4) && (speed_100 != 0))
@@ -701,7 +716,9 @@ void dumb_init_input(void)
 	
 	numInHistory = 0;
 	historyCursor = 0;
-} /* dumb_init_input */
+	historyCursorOffset = 0;
+	historyLength = 0;
+} /* hp_init_input */
 
 
 zword os_read_mouse(void)

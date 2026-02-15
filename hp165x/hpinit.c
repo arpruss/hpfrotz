@@ -1,5 +1,5 @@
 /*
- * dinit.c - Dumb interface, initialization
+ * dinit.c - HP165X interface, initialization
  *
  * This file is part of Frotz.
  *
@@ -22,14 +22,12 @@
 #include <hp165x.h>
 #include <stdarg.h>
 
-#include "dfrotz.h"
-#include "dblorb.h"
+#include "hpfrotz.h"
 
 extern f_setup_t f_setup;
 extern z_header_t z_header;
 
-static void print_version(void);
-char pick_file(char* name, char** extList, int numExts);
+static char pick_file(char* name, char** extList, int numExts);
 static char* storyExts[] = {
 	".dat",
 	".z1",
@@ -44,10 +42,8 @@ static char* storyExts[] = {
 
 
 static int user_random_seed = -1;
-static bool plain_ascii = FALSE;
 
 bool quiet_mode;
-bool do_more_prompts;
 
 long int timeTenths() {
 	return getVBLCounter()/6;
@@ -63,9 +59,7 @@ long int timeTenths() {
  */
 void os_process_arguments(int _argc, char *_argv[])
 {
-	int c, num;
 	char *p = NULL;
-	char *format_orig = NULL;
 	
 	static char story[MAX_FILE_NAME+1];
 	hp_set_window();
@@ -80,36 +74,18 @@ void os_process_arguments(int _argc, char *_argv[])
 	}
 	hp_clear_window();
 		
-	int argc = 2;
-	char* argv[2] = {"hpfrotz", story};
-
-	zoptarg = NULL;
-
-	do_more_prompts = TRUE;
 	quiet_mode = FALSE;
 
 	f_setup.format = FORMAT_NORMAL;
 
 	/* Save the story file name */
-	f_setup.story_file = strdup(argv[zoptind]);
+	f_setup.story_file = strdup(story);
 
-#ifdef NO_BASENAME
 	f_setup.story_name = strdup(f_setup.story_file);
-#else
-	f_setup.story_name = strdup(basename(argv[zoptind]));
-#endif
-#ifndef NO_BLORB
-	if (argv[zoptind+1] != NULL)
-		f_setup.blorb_file = strdup(argv[zoptind+1]);
-#endif
 
 	if (!quiet_mode) {
 		printf("Loading %s.\n", f_setup.story_file);
 
-#ifndef NO_BLORB
-	if (f_setup.blorb_file != NULL)
-		printf("Also loading %s.\n", f_setup.blorb_file);
-#endif
 	}
 
 	/* Now strip off the extension */
@@ -165,9 +141,8 @@ void os_init_screen(void)
 
 	z_header.interpreter_version = 'F';
 
-	dumb_init_input();
-	dumb_init_output();
-	dumb_init_pictures();
+	hp_init_input();
+	hp_init_output();
 } /* os_init_screen */
 
 
@@ -228,7 +203,6 @@ void os_warn (const char *s, ...)
  */
 void os_fatal (const char *s, ...)
 {
-	dumb_show_screen(FALSE);
 	fprintf(stderr, "\nFatal error: %s\n", s);
 	if (f_setup.ignore_errors)
 		fprintf(stderr, "Continuing anyway...\n");
@@ -239,34 +213,7 @@ void os_fatal (const char *s, ...)
 
 FILE *os_load_story(void)
 {
-#ifndef NO_BLORB
-	FILE *fp;
-
-	switch (dumb_blorb_init(f_setup.story_file)) {
-	case bb_err_NoBlorb:
-		/* printf("No blorb file found.\n\n"); */
-		break;
-	case bb_err_Format:
-		printf("Blorb file loaded, but unable to build map.\n\n");
-		break;
-	case bb_err_NotFound:
-		printf("Blorb file loaded, but lacks executable chunk.\n\n");
-		break;
-	case bb_err_None:
-		/* printf("No blorb errors.\n\n"); */
-		break;
-	}
-
-	fp = fopen(f_setup.story_file, "rb");
-
-	/* Is this a Blorb file containing Zcode? */
-	if (f_setup.exec_in_blorb)
-		fseek(fp, blorb_res.data.startpos, SEEK_SET);
-
-	return fp;
-#else
 	return fopen(f_setup.story_file, "rb");
-#endif
 } /* os_load_story */
 
 
@@ -276,27 +223,7 @@ FILE *os_load_story(void)
  */
 int os_storyfile_seek(FILE * fp, long offset, int whence)
 {
-#ifndef NO_BLORB
-	/* Is this a Blorb file containing Zcode? */
-	if (f_setup.exec_in_blorb) {
-		switch (whence) {
-		case SEEK_END:
-			return fseek(fp, blorb_res.data.startpos + blorb_res.length + offset, SEEK_SET);
-			break;
-		case SEEK_CUR:
-			return fseek(fp, offset, SEEK_CUR);
-			break;
-		case SEEK_SET:
-			/* SEEK_SET falls through to default */
-		default:
-			return fseek(fp, blorb_res.data.startpos + offset, SEEK_SET);
-			break;
-		}
-	} else
-		return fseek(fp, offset, whence);
-#else
 	return fseek(fp, offset, whence);
-#endif
 } /* os_storyfile_seek */
 
 
@@ -306,21 +233,21 @@ int os_storyfile_seek(FILE * fp, long offset, int whence)
  */
 int os_storyfile_tell(FILE * fp)
 {
-#ifndef NO_BLORB
-	/* Is this a Blorb file containing Zcode? */
-	if (f_setup.exec_in_blorb)
-		return ftell(fp) - blorb_res.data.startpos;
-	else
-		return ftell(fp);
-#else
 	return ftell(fp);
-#endif
 } /* os_storyfile_tell */
 
 static void intro(void)
 {
 	printf("FROTZ V%s - HP165x interface.\n", VERSION);
-	return;
+	printf("Notes:          %s\n", RELEASE_NOTES);
+	printf("  Frotz was originally written by Stefan Jokisch.\n");
+	printf("  It complies with standard 1.1 of the Z-Machine Standard.\n");
+	printf("  It was ported to Unix by Galen Hazelwood.\n");
+	printf("  It is distributed under the GNU General Public License version 2 or\n");
+	printf("    (at your option) any later version.\n");
+	printf("  This software is offered as-is with no warranty or liability.\n");
+	printf("  The HP 1652B/1653B port is maintained by Alexander Pruss.\n");
+	printf("  Frotz's homepage is https://661.org/proj/if/frotz.\n\n");
 } /* usage */
 
 
@@ -337,19 +264,3 @@ void os_init_setup(void)
 } /* os_init_setup */
 
 
-static void print_version(void)
-{
-	printf("FROTZ V%s     Dumb interface.\n", VERSION);
-	printf("Commit date:    %s\n", GIT_DATE);
-	printf("Git commit:     %s\n", GIT_HASH);
-	printf("Notes:          %s\n", RELEASE_NOTES);
-	printf("  Frotz was originally written by Stefan Jokisch.\n");
-	printf("  It complies with standard 1.1 of the Z-Machine Standard.\n");
-	printf("  It was ported to Unix by Galen Hazelwood.\n");
-	printf("  It is distributed under the GNU General Public License version 2 or\n");
-	printf("    (at your option) any later version.\n");
-	printf("  This software is offered as-is with no warranty or liability.\n");
-	printf("  The core and dumb port are maintained by David Griffith.\n");
-	printf("  Frotz's homepage is https://661.org/proj/if/frotz.\n\n");
-	return;
-} /* print_version */
