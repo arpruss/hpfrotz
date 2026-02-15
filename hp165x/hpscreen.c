@@ -91,22 +91,22 @@ char latin1_to_ibm[] = {
  *
  * The final argument gives the window being changed, -1 if only a
  * portion of a window is being erased, or -2 if the whole screen is
- * being erased.  This is not relevant for the DOS interface, and so
- * this function ignores that argument.
+ * being erased.  
  *
  */
 void os_erase_area(int top, int left, int bottom, int right, int win)
 {
 	top--;
 	left--;
-//	bottom--;
-//	right--;
 	
 	*SCREEN_MEMORY_CONTROL = BACKGROUND;
 	
 	uint16_t h = getFontHeight();
-	
-	fillRectangle(left * FONT_WIDTH, top * h, right * FONT_WIDTH, bottom * h);
+
+	if (win == -2)
+		fillScreen();
+	else
+		fillRectangle(left * FONT_WIDTH, top * h, right * FONT_WIDTH, bottom * h);
 } /* os_erase_area */
 
 
@@ -126,8 +126,6 @@ void os_scroll_area(int top, int left, int bottom, int right, int units)
 	
 	top--;
 	left--;
-//	bottom--;
-//	right--;
 	
 	uint16_t h = getFontHeight();
 	
@@ -158,8 +156,6 @@ void os_set_colour (int newfg, int newbg)
 {
 	current_fg = newfg;
 	current_bg = newbg;
-	
-//	printf("[%d %d]", newfg,newbg);
 	
 	if (newfg == BLACK_COLOUR && newbg == WHITE_COLOUR) {
 		setTextColors(BACKGROUND, FOREGROUND);

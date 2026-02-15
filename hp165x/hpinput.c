@@ -41,13 +41,7 @@ zchar history[HISTORY_BUFFER_SIZE];
 
 static int speed_100 = 100;
 
-enum input_type {
-	INPUT_CHAR,
-	INPUT_LINE,
-	INPUT_LINE_CONTINUED,
-};
-
-int getTextContinuable(char* _buffer, uint16_t _maxSize, int timeoutTicks, char continued);
+int16_t getTextContinuable(char* _buffer, uint16_t _maxSize, int timeoutTicks, char continued);
 char pick_file(char* name, char** extData, int numExts);
 long timeTenths(void);
 
@@ -61,8 +55,13 @@ static uint16_t length;
 static char singleLine;
 static uint16_t maxSize;
 
-#define INPUT_STOP (-1)
-#define INPUT_ESC  (-2)
+
+#define INPUT_STOP (-100)
+#define INPUT_HELP (-101)
+#define INPUT_UNDO (-102)
+#define INPUT_RESTART (-103)
+#define INPUT_DEBUG (-104)
+#define INPUT_SEED (-105)
 
 static void setXYFromOffset(uint16_t offset) {
 	uint16_t p = startX + offset;
@@ -180,7 +179,7 @@ static void clearBuffer(void) {
 	drawCursor();
 }
 
-int getTextContinuable(char* _buffer, uint16_t _maxSize, int timeoutTicks, char continued) {	
+int16_t getTextContinuable(char* _buffer, uint16_t _maxSize, int timeoutTicks, char continued) {	
 	uint32_t endTime = 0;
 	
 	if (0<timeoutTicks) {
@@ -217,8 +216,11 @@ int getTextContinuable(char* _buffer, uint16_t _maxSize, int timeoutTicks, char 
 				*p = ' ';
 			p++;
 		}
-		drawFrom(0);
 	}
+	else {
+		startX = getTextX() - strlen(buffer);
+	}
+	drawFrom(0);
 	drawCursor();
 	
 	while(1) {
@@ -237,15 +239,27 @@ int getTextContinuable(char* _buffer, uint16_t _maxSize, int timeoutTicks, char 
 				historyLength += length + 1;
 				return length;
 			case KEYBOARD_BREAK:
+			case KEYBOARD_ALT_ALPHA('x'):
+				clearCursor();
+				return INPUT_STOP;
+			case KEYBOARD_ALT_ALPHA('u'):
+				clearCursor();
+				return INPUT_UNDO;
+			case KEYBOARD_ALT_ALPHA('n'):
+				clearCursor();
+				return INPUT_RESTART;
+			case KEYBOARD_ALT_ALPHA('d'):
+				clearCursor();
+				return INPUT_DEBUG;
+			case KEYBOARD_ALT_ALPHA('s'):
+				clearCursor();
+				return INPUT_SEED;
+			case KEYBOARD_F1: 
+			case KEYBOARD_ALT_ALPHA('h'):
+				clearCursor();
+				return INPUT_HELP;
 			case 27:
 				clearBuffer();
-				if (c == KEYBOARD_BREAK) {
-					numInHistory--;
-					*buffer++ = ZC_HKEY_QUIT;
-					*buffer = 0;
-					clearCursor();
-					return 1;
-				}
 				break;
 				
 			case KEYBOARD_UP:
@@ -355,79 +369,20 @@ int getTextContinuable(char* _buffer, uint16_t _maxSize, int timeoutTicks, char 
 	}
 }
 
-/* Translate in place all the escape characters in s.  */
-static void translate_special_chars(zchar *s)
-{
-	zchar *src = s, *dest = s;
-	while (*src)
-		switch(*src++) {
-		default: *dest++ = src[-1]; break;
-		case '\n': *dest++ = ZC_RETURN; break;
-		case '\\':
-			switch (*src++) {
-			case '\n': *dest++ = ZC_RETURN; break;
-			case '\\': *dest++ = '\\'; break;
-			case '?': *dest++ = ZC_BACKSPACE; break;
-			case '[': *dest++ = ZC_ESCAPE; break;
-			case '_': *dest++ = ZC_RETURN; break;
-			case '^': *dest++ = ZC_ARROW_UP; break;
-			case '.': *dest++ = ZC_ARROW_DOWN; break;
-			case '<': *dest++ = ZC_ARROW_LEFT; break;
-			case '>': *dest++ = ZC_ARROW_RIGHT; break;
-			case 'R': *dest++ = ZC_HKEY_RECORD; break;
-			case 'P': *dest++ = ZC_HKEY_PLAYBACK; break;
-			case 'S': *dest++ = ZC_HKEY_SEED; break;
-			case 'U': *dest++ = ZC_HKEY_UNDO; break;
-			case 'N': *dest++ = ZC_HKEY_RESTART; break;
-			case 'X': *dest++ = ZC_HKEY_QUIT; break;
-			case 'D': *dest++ = ZC_HKEY_DEBUG; break;
-			case 'H': *dest++ = ZC_HKEY_HELP; break;
-			case '1': *dest++ = ZC_FKEY_F1; break;
-			case '2': *dest++ = ZC_FKEY_F2; break;
-			case '3': *dest++ = ZC_FKEY_F3; break;
-			case '4': *dest++ = ZC_FKEY_F4; break;
-			case '5': *dest++ = ZC_FKEY_F5; break;
-			case '6': *dest++ = ZC_FKEY_F6; break;
-			case '7': *dest++ = ZC_FKEY_F7; break;
-			case '8': *dest++ = ZC_FKEY_F8; break;
-			case '9': *dest++ = ZC_FKEY_F9; break;
-			case '0': *dest++ = ZC_FKEY_F10; break;
-			default:
-				break;
-			}
-		}
-	*dest = '\0';
-} /* translate_special_chars */
-
 
 
 /* Read a line to s.
  * Return true if timed-out.  */
 static int16_t hp_read_line(zchar *s, char *prompt, bool show_cursor,
-			   int timeout, enum input_type type,
+			   int timeout, 
 			   bool continued)
 {
-	for (;;) {
-		if (!continued) {
-			if (prompt)
-				putText(prompt);
-		}
-		else {
-			short len = strlen((char*)s);
-			if (len > 0 && s[len-1] == '\n')
-				s[len-1] = 0;
-		}
-
-		int16_t n = getTextContinuable((char*)s, INPUT_BUFFER_SIZE-2, timeout*6, continued);
-		if (0 <= n) {
-			s[n] = '\n';
-			s[n+1] = 0;
-		}
-
-		translate_special_chars(s);
-
-		return n;
+	if (!continued) {
+		if (prompt)
+			putText(prompt);
 	}
+
+	return getTextContinuable((char*)s, INPUT_BUFFER_SIZE-2, timeout*6, continued);
 } /* hp_read_line */
 
 
@@ -435,7 +390,7 @@ static int16_t hp_read_line(zchar *s, char *prompt, bool show_cursor,
  * filename requests).  */
 static int16_t hp_read_misc_line(char *s, char *prompt)
 {
-	int16_t result = hp_read_line((zchar*)s, prompt, 0, 0, 0, 0);
+	int16_t result = hp_read_line((zchar*)s, prompt, 0, 0, 0);
 	/* Remove terminating newline */
 	s[strlen(s) - 1] = '\0';
 	return result;
@@ -468,27 +423,28 @@ zchar os_read_key (int timeout, bool show_cursor)
 
 zchar os_read_line (int UNUSED (max), zchar *buf, int timeout, int UNUSED(width), int continued)
 {
-	zchar *p;
-	int terminator;
-
 	int16_t result = hp_read_line(buf, NULL, TRUE,
-		timeout * 100 / speed_100, buf[0] ? INPUT_LINE_CONTINUED : INPUT_LINE,
+		timeout * 100 / speed_100, 
 		continued);
 		
-	if (result == ERROR_TIMEOUT) {
-		return ZC_TIME_OUT;
+	switch (result) {
+		case ERROR_TIMEOUT:
+			return ZC_TIME_OUT;
+		case INPUT_STOP:
+			return ZC_HKEY_QUIT;
+		case INPUT_HELP:
+			return ZC_HKEY_HELP;
+		case INPUT_UNDO:
+			return ZC_HKEY_UNDO;
+		case INPUT_RESTART:
+			return ZC_HKEY_RESTART;
+		case INPUT_DEBUG:
+			return ZC_HKEY_DEBUG;
+		case INPUT_SEED:
+			return ZC_HKEY_SEED;
+		default:
+			return 13;
 	}
-
-	/* find the terminating character.  */
-	for (p = buf;; p++) {
-		if (is_terminator(*p)) {
-			terminator = *p;
-			*p++ = '\0';
-			break;
-		}
-	}
-	
-	return terminator;
 } /* os_read_line */
 
 static char right_type(DirEntry_t* d, char** extList, int numExts) {
