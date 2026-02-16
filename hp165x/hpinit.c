@@ -44,9 +44,10 @@ static char* storyExts[] = {
 static int user_random_seed = -1;
 
 bool quiet_mode;
+static uint16_t tickRate = 60;
 
 long int timeTenths() {
-	return getVBLCounter()/6;
+	return getVBLCounter()*10/ticksPerSecond();
 }
 
 
@@ -254,11 +255,8 @@ static void intro(void)
 void os_init_setup(void)
 {
 	patchVBL();
-	*SCREEN_MEMORY_CONTROL = BACKGROUND;
-	fillScreen();
-	*SCREEN_MEMORY_CONTROL = FOREGROUND;
-	setTextColors(WRITE_WHITE,WRITE_BLACK);
-	setTextXY(0,0);
+	initScreen(392, BACKGROUND); 
+	tickRate = ticksPerSecond();
 	initKeyboard(1);
 	intro();
 } /* os_init_setup */
