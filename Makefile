@@ -2,7 +2,10 @@ SRCS=common/buffer.c common/err.c common/fastmem.c common/files.c common/getopt.
 common/main.c common/math.c common/missing.c common/object.c common/process.c common/quetzal.c \
 common/random.c common/redirect.c common/screen.c common/sound.c common/stream.c common/table.c \
 common/text.c common/variable.c hp165x/hpinit.c \
-hp165x/fakefile.c hp165x/hpscreen.c hp165x/hpinput.c
+hp165x/hpscreen.c hp165x/hpinput.c
+
+# fakefile is a lot faster than stdio for some reason!
+SRCS += hp165x/fakefile.c 
 
 CPU=68000
 
@@ -12,8 +15,8 @@ PREFIX=m68k-elf
 HPLIB=hp165x
 PRINTF_VERSION= #--defsym=vfscanf=__d_vfscanf --defsym=vfprintf=__d_vfprintf 
 GCC_LIB_DIR=C:/68k/bin/../lib/gcc/m68k-elf/13.1.0/m$(CPU)/ 
-CFLAGS=-DNO_BLORB -DNO_BASENAME -DNO_SCRIPT -DFILENAME_MAX=10 -DMAX_FILE_NAME=10 \
-	-Dfseek=myfseek -Dftell=myftell -Dfgetc=myfgetc -Dfopen=myfopen -Dfclose=myfclose \
+CFLAGS =-DNO_BLORB -DNO_BASENAME -DNO_SCRIPT -DFILENAME_MAX=10 -DMAX_FILE_NAME=10 
+CFLAGS += -Dfseek=myfseek -Dftell=myftell -Dfgetc=myfgetc -Dfopen=myfopen -Dfclose=myfclose \
 	-Dfwrite=myfwrite -Dfread=myfread -Dferror=myferror -Dfputc=myfputc
 
 LIBRARY=picolibc
@@ -36,7 +39,7 @@ OBJCOPY=$(PREFIX)-objcopy
 OBJDUMP=$(PREFIX)-objdump
 
 CFLAGS+=-m$(CPU) $(LIBC_OPTIONS) --save-temps -Wno-unknown-pragmas -Wno-builtin-declaration-mismatch -Wall -Wextra -static -I../libhp165x -I$(LIBC_INCLUDE) -I. -msoft-float -MMD -MP -O99
-LFLAGS=-gc-sections $(PRINTF_VERSION) -L../libhp165x -L$(LIBC_LIB_DIR) --script=platform.ld -l$(HPLIB) -l$(LIBC) -l$(HPLIB) -L$(GCC_LIB_DIR) -lgcc
+LFLAGS=-gc-sections $(PRINTF_VERSION) -L../libhp165x -L$(LIBC_LIB_DIR) --script=platform.ld -l$(HPLIB) -l$(LIBC) -l$(HPLIB) -l$(LIBC) -L$(GCC_LIB_DIR) -lgcc
 
 OBJS=$(patsubst %.c,$(BUILDDIR)/%.c.o,$(SRCS))
 OBJS:=$(patsubst %.S,$(BUILDDIR)/%.S.o,$(OBJS))
