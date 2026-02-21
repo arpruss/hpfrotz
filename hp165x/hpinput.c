@@ -54,7 +54,7 @@ static uint16_t cursor;
 static uint16_t length;
 static char singleLine;
 static uint16_t maxSize;
-
+static char afterHotkey = 0;
 
 #define INPUT_STOP (-100)
 #define INPUT_HELP (-101)
@@ -109,10 +109,12 @@ static void drawFrom(uint16_t offset) {
 static void clearCursor(void) {
 	setXYFromOffset(cursor);
 	setScrollMode(0);
+	uint16_t x = getTextX();
 	if (cursor<length)
 		putChar(buffer[cursor]);
 	else
 		putChar(' ');
+	setTextX(x);
 	setScrollMode(1);
 }
 
@@ -196,6 +198,7 @@ int16_t getTextContinuable(char* _buffer, uint16_t _maxSize, int timeoutTicks, c
 	}
 	
 	if (! continued) {
+		afterHotkey = 0;
 		prepareHistory();
 		setTextReverse(0);
 		setScrollMode(1);
@@ -218,8 +221,10 @@ int16_t getTextContinuable(char* _buffer, uint16_t _maxSize, int timeoutTicks, c
 		}
 	}
 	else {
-		startX = getTextX() - strlen(buffer);
+		if (afterHotkey)
+			startX = 0;
 	}
+	afterHotkey = 0;
 	drawFrom(0);
 	drawCursor();
 	
@@ -241,22 +246,28 @@ int16_t getTextContinuable(char* _buffer, uint16_t _maxSize, int timeoutTicks, c
 			case KEYBOARD_BREAK:
 			case KEYBOARD_ALT_ALPHA('x'):
 				clearCursor();
+				afterHotkey = 1;
 				return INPUT_STOP;
 			case KEYBOARD_ALT_ALPHA('u'):
 				clearCursor();
+				afterHotkey = 1;
 				return INPUT_UNDO;
 			case KEYBOARD_ALT_ALPHA('n'):
 				clearCursor();
+				afterHotkey = 1;
 				return INPUT_RESTART;
 			case KEYBOARD_ALT_ALPHA('d'):
 				clearCursor();
+				afterHotkey = 1;
 				return INPUT_DEBUG;
 			case KEYBOARD_ALT_ALPHA('s'):
 				clearCursor();
+				afterHotkey = 1;
 				return INPUT_SEED;
 			case KEYBOARD_F1: 
 			case KEYBOARD_ALT_ALPHA('h'):
 				clearCursor();
+				afterHotkey = 1;
 				return INPUT_HELP;
 			case 27:
 				clearBuffer();
