@@ -33,9 +33,9 @@
 #define WRITE_OVERLAY_BACKGROUND 0b100000000001
 #define WRITE_OVERLAY_ERASE 	 0b111000000001
 
-#define WIN_X1 10
+#define WIN_X1 9
 #define WIN_Y1 4
-#define WIN_X2 70
+#define WIN_X2 71
 #define WIN_Y2 22
 
 static uint16_t savedX;

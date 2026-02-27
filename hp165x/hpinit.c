@@ -24,10 +24,11 @@
 
 #include "hpfrotz.h"
 
+char pick_file(char* name, char** extData, int numExts);
+
 extern f_setup_t f_setup;
 extern z_header_t z_header;
 
-static char pick_file(char* name, char** extList, int numExts);
 static char* storyExts[] = {
 	".dat",
 	".z1",

@@ -402,8 +402,7 @@ static int16_t hp_read_line(zchar *s, char *prompt, bool show_cursor,
 static int16_t hp_read_misc_line(char *s, char *prompt)
 {
 	int16_t result = hp_read_line((zchar*)s, prompt, 0, 0, 0);
-	/* Remove terminating newline */
-	s[strlen(s) - 1] = '\0';
+	putChar('\n');
 	return result;
 } /* hp_read_misc_line */
 
