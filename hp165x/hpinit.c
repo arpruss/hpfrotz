@@ -24,8 +24,6 @@
 
 #include "hpfrotz.h"
 
-char pick_file(char* name, char** extData, int numExts);
-
 extern f_setup_t f_setup;
 extern z_header_t z_header;
 
@@ -67,9 +65,12 @@ void os_process_arguments(int _argc, char *_argv[])
 	hp_set_window();
 	if (!pick_file(story,storyExts,sizeof(storyExts)/sizeof(*storyExts))) {
 		putText("Please enter a filename: ");
-		short n = getText(story, MAX_FILE_NAME+1);
+
+		*story = 0;
+		int16_t r = getTextContinuable(story, MAX_FILE_NAME+1, 0, 0, 1);
 		putText("\n");
-		if (n <= 0) {
+
+		if (*story == 0 || r == INPUT_STOP) {
 			putText("Goodbye!");
 			os_quit(0);
 		}

@@ -41,8 +41,6 @@ zchar history[HISTORY_BUFFER_SIZE];
 
 static int speed_100 = 100;
 
-int16_t getTextContinuable(char* _buffer, uint16_t _maxSize, int timeoutTicks, char continued);
-char pick_file(char* name, char** extData, int numExts);
 long timeTenths(void);
 
 static uint16_t startX;
@@ -55,13 +53,6 @@ static uint16_t length;
 static char singleLine;
 static uint16_t maxSize;
 static char afterHotkey = 0;
-
-#define INPUT_STOP (-100)
-#define INPUT_HELP (-101)
-#define INPUT_UNDO (-102)
-#define INPUT_RESTART (-103)
-#define INPUT_DEBUG (-104)
-#define INPUT_SEED (-105)
 
 static void setXYFromOffset(uint16_t offset) {
 	uint16_t p = startX + offset;
@@ -181,7 +172,7 @@ static void clearBuffer(void) {
 	drawCursor();
 }
 
-int16_t getTextContinuable(char* _buffer, uint16_t _maxSize, int timeoutTicks, char continued) {	
+int16_t getTextContinuable(char* _buffer, uint16_t _maxSize, int timeoutTicks, bool continued, bool cancelable) {	
 	uint32_t endTime = 0;
 	
 	if (0<timeoutTicks) {
@@ -270,6 +261,11 @@ int16_t getTextContinuable(char* _buffer, uint16_t _maxSize, int timeoutTicks, c
 				afterHotkey = 1;
 				return INPUT_HELP;
 			case 27:
+				if (cancelable) {
+					clearCursor();
+					afterHotkey = 1;
+					return INPUT_STOP;
+				}
 				clearBuffer();
 				break;
 				
@@ -384,24 +380,23 @@ int16_t getTextContinuable(char* _buffer, uint16_t _maxSize, int timeoutTicks, c
 
 /* Read a line to s.
  * Return true if timed-out.  */
-static int16_t hp_read_line(zchar *s, char *prompt, bool show_cursor,
-			   int timeout, 
-			   bool continued)
+static int16_t hp_read_line(zchar *s, uint16_t bufferSize, char *prompt, bool show_cursor,
+			   int timeout, bool continued, bool cancelable)
 {
 	if (!continued) {
 		if (prompt)
 			putText(prompt);
 	}
 
-	return getTextContinuable((char*)s, INPUT_BUFFER_SIZE-2, timeout*6, continued);
+	return getTextContinuable((char*)s, bufferSize, timeout*6, continued, cancelable);
 } /* hp_read_line */
 
 
 /* Read a line that is not part of z-machine input (more prompts and
  * filename requests).  */
-static int16_t hp_read_misc_line(char *s, char *prompt)
+static int16_t hp_read_misc_line(char *s, char *prompt, uint16_t length)
 {
-	int16_t result = hp_read_line((zchar*)s, prompt, 0, 0, 0);
+	int16_t result = hp_read_line((zchar*)s, length, prompt, 0, 0, 0, 1);
 	putChar('\n');
 	return result;
 } /* hp_read_misc_line */
@@ -433,9 +428,9 @@ zchar os_read_key (int timeout, bool show_cursor)
 
 zchar os_read_line (int UNUSED (max), zchar *buf, int timeout, int UNUSED(width), int continued)
 {
-	int16_t result = hp_read_line(buf, NULL, TRUE,
+	int16_t result = hp_read_line(buf, INPUT_BUFFER_SIZE-1, NULL, TRUE,
 		timeout * 100 / speed_100, 
-		continued);
+		continued, 0);
 		
 	switch (result) {
 		case ERROR_TIMEOUT:
@@ -580,7 +575,7 @@ char *hp_read_file_name (const char *default_name, int flag) {
 		
 		sprintf(prompt, "Please enter a filename [%s]: ", default_name);
 
-		if (hp_read_misc_line(fullpath, prompt) < 0)
+		if (hp_read_misc_line(fullpath, prompt, MAX_FILE_NAME - 4 + 1) < 0)
 			return NULL;
 
 		/* If using default filename... */
@@ -630,9 +625,10 @@ char *hp_read_file_name (const char *default_name, int flag) {
 	if ((flag == FILE_SAVE || flag == FILE_SAVE_AUX || flag == FILE_RECORD)
 		&& ((fp = fopen(file_name, "rb")) != NULL)) {
 		fclose (fp);
-		if (hp_read_misc_line(fullpath, "Overwrite existing file? ") < 0)
-			return NULL;
-		if (tolower(fullpath[0]) != 'y') {
+		putText("Overwrite existing file? ");
+		int c = getch();
+		putChar(c);
+		if (tolower(c) != 'y') {
 			return NULL;
 		}
 	}

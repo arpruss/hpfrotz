@@ -70,4 +70,14 @@ bool dumb_init_pictures(void);
 #define FOREGROUND WRITE_WHITE
 #define BACKGROUND WRITE_BLACK
 
+#define INPUT_STOP (-100)
+#define INPUT_HELP (-101)
+#define INPUT_UNDO (-102)
+#define INPUT_RESTART (-103)
+#define INPUT_DEBUG (-104)
+#define INPUT_SEED (-105)
+
+char pick_file(char* name, char** extData, int numExts);
+int16_t getTextContinuable(char* _buffer, uint16_t _maxSize, int timeoutTicks, bool continued, bool cancelable);
+
 #endif
