@@ -167,7 +167,7 @@ int os_random_seed (void)
 void os_quit(int status)
 {
 	if (status)
-		waitSeconds(5);
+		waitSeconds(2);
 	else
 		waitSeconds(1);
 	reload();
@@ -222,9 +222,8 @@ FILE *os_load_story(void)
 {
 	/* this is a large file, so don't buffer it all into memory;
 		instead, open and reopen it as needed */
-	hpPosixSetUnbufferedReadOpen(1);
+	hpPosixSetBufferedReadMaximum(100000);
 	FILE* f = fopen(f_setup.story_file, "rb");
-	hpPosixSetUnbufferedReadOpen(0);
 	return f;
 } /* os_load_story */
 
