@@ -5,3 +5,4 @@ python ../../lifutils.py put e:/DSKA0005.HFE hpfrotz.bin SYSTEM_ c001
 #python ../../lifutils.py put frotz.lif nord.z4 1
 #(cd ../.. && ./lif2hfe.sh c/hpfrotz/frotz)
 #cp frotz.hfe e:/DSKA0005.HFE
+echo e:/DSKA0005.HFE
