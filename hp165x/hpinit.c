@@ -20,6 +20,7 @@
  */
 
 #include <hp165x.h>
+#include <hpposix.h>
 #include <stdarg.h>
 
 #include "hpfrotz.h"
@@ -165,7 +166,10 @@ int os_random_seed (void)
  */
 void os_quit(int status)
 {
-	waitSeconds(1);
+	if (status)
+		waitSeconds(5);
+	else
+		waitSeconds(1);
 	reload();
 } /* os_quit */
 
@@ -216,7 +220,12 @@ void os_fatal (const char *s, ...)
 
 FILE *os_load_story(void)
 {
-	return fopen(f_setup.story_file, "rb");
+	/* this is a large file, so don't buffer it all into memory;
+		instead, open and reopen it as needed */
+	hpPosixSetUnbufferedReadOpen(1);
+	FILE* f = fopen(f_setup.story_file, "rb");
+	hpPosixSetUnbufferedReadOpen(0);
+	return f;
 } /* os_load_story */
 
 
