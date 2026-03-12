@@ -172,6 +172,40 @@ static void clearBuffer(void) {
 	drawCursor();
 }
 
+static void complete(void)
+{
+	int status;
+
+	if (length == cursor) {
+		zchar extension[10];
+
+		status = completion((zchar*)buffer, extension);
+	
+		if (status == 0) {
+			unsigned short extLength = strlen((char*)extension);
+			if (length + extLength < maxSize) {
+				clearCursor();
+				strcpy(buffer+length, (char*)extension);
+				length += extLength;
+				buffer[length] = 0;
+				drawFrom(cursor);
+				cursor += extLength;
+				drawCursor();
+			}
+			else {
+				status = 2;
+			}
+		}
+	} 
+	else {
+		status = 2;
+	}
+
+	/* Beep if the completion was impossible or ambiguous */
+	if (status != 0)
+		os_beep(status);
+} 
+
 int16_t getTextContinuable(char* _buffer, uint16_t _maxSize, int timeoutTicks, bool continued, bool cancelable) {	
 	uint32_t endTime = 0;
 	
@@ -234,6 +268,9 @@ int16_t getTextContinuable(char* _buffer, uint16_t _maxSize, int timeoutTicks, b
 				memcpy(history + historyLastOffset, buffer, length + 1);
 				historyLength += length + 1;
 				return length;
+			case '\t':
+				complete();
+				break;
 			case KEYBOARD_BREAK:
 			case KEYBOARD_ALT_ALPHA('x'):
 				clearCursor();
