@@ -309,6 +309,7 @@ int16_t getTextContinuable(char* _buffer, uint16_t _maxSize, int timeoutTicks, b
 			case KEYBOARD_UP:
 				if (*buffer && strcmp((char*)history+historyCursorOffset, buffer)) { // commmit changed history entry to history
 					strncpy((char*)history+historyLastOffset, buffer, INPUT_BUFFER_SIZE);
+					history[historyLastOffset+INPUT_BUFFER_SIZE-1] = 0;
 					historyCursorOffset = historyLastOffset;
 					historyCursor = numInHistory-1;
 				}
@@ -328,6 +329,7 @@ int16_t getTextContinuable(char* _buffer, uint16_t _maxSize, int timeoutTicks, b
 			case KEYBOARD_DOWN:
 				if (*buffer && strcmp((char*)history+historyCursorOffset, buffer)) { // commmit changed history entry to history
 					strncpy((char*)history+historyLastOffset, buffer, INPUT_BUFFER_SIZE);
+					history[historyLastOffset+INPUT_BUFFER_SIZE-1] = 0;
 					historyCursorOffset = historyLastOffset;
 					historyCursor = numInHistory-1;
 				}
@@ -561,6 +563,7 @@ char pick_file(char* name, char** extData, int numExts) {
 				if (right_type(&d, extData, numExts)) {
 					if (pos == seekPos) {
 						strncpy(name, d.name, MAX_FILE_NAME + 1);
+						name[MAX_FILE_NAME] = 0;
 						putText("Selected: ");
 						putText(d.name);
 						putText(".\n");
@@ -632,7 +635,8 @@ char *hp_read_file_name (const char *default_name, int flag) {
 	}
 
 	assert(buf);
-	strncpy(file_name, buf, FILENAME_MAX);
+	strncpy(file_name, buf, FILENAME_MAX+1);
+	file_name[FILENAME_MAX]=0;
 	if (freebuf) free(buf);
 
 	/* Add appropriate filename extensions if not already there. */
@@ -694,10 +698,24 @@ char *hp_read_file_name (const char *default_name, int flag) {
  *
  * Return value is NULL if there was a problem.
  */
-char *os_read_file_name (const char *default_name, int flag)
+char *os_read_file_name(const char *default_name, int flag)
 {
+	static char fixed_name[MAX_FILE_NAME+1];
+	char* ext = strrchr(default_name, '.');
+	if (ext == NULL) {
+		strncpy(fixed_name, default_name, MAX_FILE_NAME);
+		fixed_name[MAX_FILE_NAME] = 0;
+	}
+	else {
+		short extLen = strlen(ext);
+		short baseLen = ext - default_name;
+		if (baseLen + extLen > MAX_FILE_NAME)
+			baseLen = MAX_FILE_NAME - extLen;
+		strncpy(fixed_name, default_name, baseLen);
+		strcpy(fixed_name + baseLen, ext);
+	}
 	hp_set_window();
-	char* p = hp_read_file_name(default_name, flag);
+	char* p = hp_read_file_name(fixed_name, flag);
 	hp_clear_window();
 
 	return p;
