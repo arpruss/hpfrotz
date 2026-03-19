@@ -884,13 +884,13 @@ void z_restore(void)
 	 */
 		/* Get the file name */
 		new_name = os_read_file_name(f_setup.save_name, FILE_RESTORE);
-		if (new_name == NULL)
+		if (new_name == NULL) 
 			goto finished;
 		zfree(f_setup.save_name);
 		f_setup.save_name = strdup(new_name);
 
 		/* Open game file */
-		if ((gfp = fopen(new_name, "rb")) == NULL)
+		if ((gfp = fopen(new_name, "rb")) == NULL) 
 			goto finished;
 		success = restore_quetzal(gfp, story_fp);
 		if ((short) success >= 0) {

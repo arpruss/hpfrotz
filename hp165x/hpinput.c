@@ -489,7 +489,7 @@ zchar os_read_line (int UNUSED (max), zchar *buf, int timeout, int UNUSED(width)
 	}
 } /* os_read_line */
 
-static char right_type(DirEntry_t* d, char** extList, int numExts) {
+char right_type(DirEntry_t* d, char** extList, int numExts) {
 	if (d->type == 0)
 		return 0;
 	short nameLen = strlen(d->name);
@@ -592,7 +592,8 @@ char *hp_read_file_name (const char *default_name, int flag) {
 	 */
 	if (f_setup.restore_mode) {
 		/* Caller always strdups */
-		return (char*)default_name;
+		strcpy(file_name, default_name);
+		return file_name;
 	} else if (flag == FILE_NO_PROMPT) {
 		ext = strrchr(default_name, '.');
 		if (strncmp(ext, EXT_AUX, 4)) {

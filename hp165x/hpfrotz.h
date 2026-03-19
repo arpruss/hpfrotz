@@ -63,6 +63,7 @@ void dumb_set_picture_cell(int row, int col, zchar c);
 
 void hp_set_window(void);
 void hp_clear_window(void);
+char right_type(DirEntry_t* d, char** extList, int numExts);
 
 /* dumb-pic.c */
 bool dumb_init_pictures(void);

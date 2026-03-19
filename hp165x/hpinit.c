@@ -37,7 +37,8 @@ static char* storyExts[] = {
 	".z5",
 	".z6",
 	".z7",
-	".z8"	
+	".z8",
+	".qzl"
 };
 
 
@@ -50,6 +51,82 @@ long int timeTenths() {
 	return getVBLCounter()*10/ticksPerSecond();
 }
 
+struct chunkHeader {
+	uint32_t chunkType;
+	uint32_t size; // big endian, like HP
+};
+
+struct IFhd {
+	uint16_t release;
+	char serial[6];
+	uint16_t checksum;
+};
+
+static bool findStoryForHeader(char* story, struct IFhd* header) {
+	DirEntry_t d;
+	char buffer[0x20];
+	uint16_t i = 0;
+	while (-1 != getDirEntry(i, &d)) {
+		if (right_type(&d, storyExts, sizeof storyExts / sizeof *storyExts)) {
+			hpPosixSetBufferedReadMaximum(0);
+			FILE* f = fopen(d.name, "rb");
+			hpPosixSetBufferedReadMaximum(DEFAULT_BUFFERED_READ_MAXIMUM);
+			if (f != NULL) {
+				int32_t n = fread(buffer, 1, 0x20, f);
+				fclose(f);
+				if (n == 0x20 && *(uint16_t*)(buffer+2) == header->release &&
+					*(uint16_t*)(buffer+0x1c) == header->checksum &&
+					!memcmp(buffer+0x12, header->serial, 6)) {
+						strcpy(story, d.name);
+						return 1;
+				}
+			}
+		}
+		i++;
+	}
+	return 0;
+}
+
+static bool findStoryForSave(char* story, char* save) {
+	struct chunkHeader ch;
+	char* header[13];
+
+	FILE* f = fopen(save, "rb");
+	if (f == NULL)
+		return 0;
+	
+	if (12 != fread(header,1,12,f)) {
+		fclose(f);
+		return 0;
+	}
+	
+	uint32_t* h = (uint32_t*)header;
+	if (h[0] != 'FORM' || h[2] != 'IFZS') {
+		fclose(f);
+		return 0;
+	}
+	
+	while(1) {
+		if (sizeof(ch) != fread(&ch, 1, sizeof(ch), f)) {
+			fclose(f);
+			return 0;
+		}
+		if (ch.chunkType == 'IFhd') {
+			if (13 != fread(header,1,13,f)) {
+				fclose(f);
+				return 0;
+			}
+			fclose(f);
+			return findStoryForHeader(story, (struct IFhd*)header);
+		}
+		else {
+			if (0 != fseek(f, ch.size, SEEK_CUR)) {
+				fclose(f);
+				return 0;
+			}				
+		}
+	}
+}
 
 /*
  * os_process_arguments
@@ -63,6 +140,7 @@ void os_process_arguments(int _argc, char *_argv[])
 	char *p = NULL;
 	
 	static char story[MAX_FILE_NAME+1];
+	static char save[MAX_FILE_NAME+1];
 	hp_set_window();
 	if (!pick_file(story,storyExts,sizeof(storyExts)/sizeof(*storyExts))) {
 		putText("Please enter a filename: ");
@@ -72,11 +150,25 @@ void os_process_arguments(int _argc, char *_argv[])
 		putText("\n");
 
 		if (*story == 0 || r == INPUT_STOP) {
-			putText("Goodbye!");
+			putText("Goodbye!\n");
 			os_quit(0);
 		}
 	}
 	hp_clear_window();
+	
+	short n = strlen(story);
+	short e = strlen(EXT_SAVE);
+	if (n >= e && 0==strcasecmp(story+n-e, EXT_SAVE)) {
+		strcpy(save, story);
+		if (!findStoryForSave(story, save)) {
+			putText("Cannot find matching story file.\n");
+			os_quit(2);
+		}
+		f_setup.restore_mode = 1;
+	}
+	else {
+		f_setup.restore_mode = 0;
+	}
 		
 	quiet_mode = FALSE;
 
@@ -113,9 +205,7 @@ void os_process_arguments(int _argc, char *_argv[])
 		memcpy(f_setup.save_name, f_setup.story_name, (strlen(f_setup.story_name) + strlen(EXT_SAVE)) * sizeof(char));
 		strncat(f_setup.save_name, EXT_SAVE, strlen(EXT_SAVE) + 1);
 	} else { /* Set our auto load save as the name save */
-		f_setup.save_name = malloc((strlen(f_setup.tmp_save_name) + strlen(EXT_SAVE) + 1) * sizeof(char));
-                memcpy(f_setup.save_name, f_setup.tmp_save_name, (strlen(f_setup.tmp_save_name) + strlen(EXT_SAVE)) * sizeof(char));
-                free(f_setup.tmp_save_name);
+		f_setup.save_name = strdup(save);
 	}
 
 	f_setup.aux_name = malloc((strlen(f_setup.story_name) + strlen(EXT_AUX) + 1) * sizeof(char));
@@ -167,9 +257,9 @@ int os_random_seed (void)
 void os_quit(int status)
 {
 	if (status)
-		waitSeconds(2);
+		waitSeconds(4);
 	else
-		waitSeconds(1);
+		waitSeconds(2);
 	reload();
 } /* os_quit */
 
