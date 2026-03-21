@@ -87,45 +87,55 @@ static bool findStoryForHeader(char* story, struct IFhd* header) {
 	return 0;
 }
 
-static bool findStoryForSave(char* story, char* save) {
+static struct IFhd* getSaveHeader(char* save) {
 	struct chunkHeader ch;
-	char* header[13];
+	
+	static union {
+		uint32_t h[3];
+		struct IFhd IFhd;
+	} header;
 
 	FILE* f = fopen(save, "rb");
 	if (f == NULL)
-		return 0;
+		return NULL;
 	
-	if (12 != fread(header,1,12,f)) {
+	if (12 != fread(header.h,1,12,f)) {
 		fclose(f);
-		return 0;
+		return NULL;
 	}
 	
-	uint32_t* h = (uint32_t*)header;
-	if (h[0] != 'FORM' || h[2] != 'IFZS') {
+	if (header.h[0] != 'FORM' || header.h[2] != 'IFZS') {
 		fclose(f);
-		return 0;
+		return NULL;
 	}
 	
 	while(1) {
 		if (sizeof(ch) != fread(&ch, 1, sizeof(ch), f)) {
 			fclose(f);
-			return 0;
+			return NULL;
 		}
 		if (ch.chunkType == 'IFhd') {
-			if (13 != fread(header,1,13,f)) {
+			if (13 != fread(&header.IFhd,1,13,f)) {
 				fclose(f);
-				return 0;
+				return NULL;
 			}
 			fclose(f);
-			return findStoryForHeader(story, (struct IFhd*)header);
+			return &header.IFhd;
 		}
 		else {
 			if (0 != fseek(f, ch.size, SEEK_CUR)) {
 				fclose(f);
-				return 0;
+				return NULL;
 			}				
 		}
 	}
+}
+
+static bool findStoryForSave(char* story, const char* save) {
+	struct IFhd* h = getSaveHeader(save);
+	if (h == NULL)
+		return false;
+	return findStoryForHeader(story, h);
 }
 
 /*

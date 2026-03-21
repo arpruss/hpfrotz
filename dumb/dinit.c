@@ -125,11 +125,9 @@ void os_process_arguments(int argc, char *argv[])
 		case 'm':
 			do_more_prompts = FALSE;
 			break;
-#ifndef NO_SCRIPT			
 		case 'n':
 			f_setup.script_name_override = strdup(zoptarg);
 			break;
-#endif			
 		case 'o':
 			f_setup.object_movement = 1;
 			break;
@@ -255,10 +253,7 @@ void os_process_arguments(int argc, char *argv[])
 	if ( p != NULL )
 		*p = '\0';	/* extension removed */
 
-
 	/* Create nice default file names */
-
-#ifndef NO_SCRIPT
 	f_setup.script_name = malloc((strlen(f_setup.story_name) + strlen(EXT_SCRIPT) + 1) * sizeof(char));
 	memcpy(f_setup.script_name, f_setup.story_name, (strlen(f_setup.story_name) + strlen(EXT_SCRIPT)) * sizeof(char));
 	strncat(f_setup.script_name, EXT_SCRIPT, strlen(EXT_SCRIPT)+1);
@@ -266,7 +261,6 @@ void os_process_arguments(int argc, char *argv[])
 	f_setup.command_name = malloc((strlen(f_setup.story_name) + strlen(EXT_COMMAND) + 1) * sizeof(char));
 	memcpy(f_setup.command_name, f_setup.story_name, (strlen(f_setup.story_name) + strlen(EXT_COMMAND)) * sizeof(char));
 	strncat(f_setup.command_name, EXT_COMMAND, strlen(EXT_COMMAND)+1);
-#endif
 
 	if (!f_setup.restore_mode) {
 		f_setup.save_name = malloc((strlen(f_setup.story_name) + strlen(EXT_SAVE) + 1) * sizeof(char));

@@ -586,9 +586,7 @@ void os_display_char (zchar c)
 void os_display_string (const zchar *s)
 {
 	zchar c;
-	
-	printf("<str:%s [%d,%d]>",s);
-	
+
 	while ((c = *s++) != 0) {
 		if (c == ZC_NEW_FONT)
 			s++;
@@ -648,7 +646,6 @@ int os_font_data(int font, int *height, int *width)
 
 void os_set_colour (int newfg, int newbg)
 {
-	printf("[%d %d]", newfg, newbg);
 	current_fg = frotz_to_dumb[newfg];
 	current_bg = frotz_to_dumb[newbg];
 } /* os_set_colour */
@@ -714,7 +711,6 @@ void os_set_cursor(int row, int col)
 	cursor_row = row - 1; cursor_col = col - 1;
 	if (cursor_row >= z_header.screen_rows)
 		cursor_row = z_header.screen_rows - 1;
-	printf("<SC:%d,%d>",row,col);
 } /* os_set_cursor */
 
 

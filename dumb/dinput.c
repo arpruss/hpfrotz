@@ -338,7 +338,6 @@ static bool dumb_read_line(char *s, char *prompt, bool show_cursor,
  * filename requests).  */
 static void dumb_read_misc_line(char *s, char *prompt)
 {
-printf("dumb_read_misc_line");
 	dumb_read_line(s, prompt, 0, 0, 0, 0);
 	/* Remove terminating newline */
 	s[strlen(s) - 1] = '\0';
@@ -393,7 +392,6 @@ zchar os_read_key (int timeout, bool show_cursor)
 	zchar c;
 	int timed_out;
 	int idx = 1;
-printf("os_read_key  %d %d\n", timeout, show_cursor);
 
 	/* Discard any keys read for line input.  */
 	read_line_buffer[0] = '\0';
@@ -435,9 +433,7 @@ zchar os_read_line (int UNUSED (max), zchar *buf, int timeout, int UNUSED(width)
 #ifdef USE_UTF8
 	int i, j, len;
 #endif
-printf("os_read_line\n");
 
-printf("ARP time ahead 0: %d\n", time_ahead);
 	/* Discard any keys read for single key input.  */
 	read_key_buffer[0] = '\0';
 
@@ -446,15 +442,12 @@ printf("ARP time ahead 0: %d\n", time_ahead);
 	if (timed_out_last_time && !continued)
 		read_line_buffer[0] = '\0';
 
-printf("ARP timeout: %d\n", timeout);
 	if (read_line_buffer[0] == '\0') {
 		timed_out = dumb_read_line(read_line_buffer, NULL, TRUE,
 			timeout, buf[0] ? INPUT_LINE_CONTINUED : INPUT_LINE,
 			buf);
 	} else
 		timed_out = check_timeout(timeout);
-printf("ARP timed_out: %d\n", timed_out);
-printf("ARP time ahead: %d\n", time_ahead);
 
 	if (timed_out) {
 		timed_out_last_time = TRUE;
@@ -640,7 +633,6 @@ char *os_read_file_name (const char *default_name, int flag)
 
 void os_more_prompt (void)
 {
-	printf("os_more_prompt\n");
 	if (do_more_prompts) {
 		char buf[INPUT_BUFFER_SIZE];
 		dumb_read_misc_line(buf, "***MORE***");
