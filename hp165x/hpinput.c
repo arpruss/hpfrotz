@@ -596,6 +596,8 @@ char *hp_read_file_name (const char *default_name, int flag) {
 	if (f_setup.restore_mode) {
 		/* Caller always strdups */
 		strcpy(file_name, default_name);
+		printf("<%s>\n", file_name);
+		waitSeconds(2);
 		return file_name;
 	} else if (flag == FILE_NO_PROMPT) {
 		ext = strrchr(default_name, '.');

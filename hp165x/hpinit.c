@@ -65,6 +65,7 @@ struct IFhd {
 static bool findStoryForHeader(char* story, struct IFhd* header) {
 	DirEntry_t d;
 	char buffer[0x20];
+	
 	uint16_t i = 0;
 	while (-1 != getDirEntry(i, &d)) {
 		if (right_type(&d, storyExts, sizeof storyExts / sizeof *storyExts)) {
@@ -99,7 +100,7 @@ static struct IFhd* getSaveHeader(char* save) {
 	if (f == NULL)
 		return NULL;
 	
-	if (12 != fread(header.h,1,12,f)) {
+	if (sizeof(header.h) != fread(header.h,1,sizeof(header.h),f)) {
 		fclose(f);
 		return NULL;
 	}
@@ -115,7 +116,7 @@ static struct IFhd* getSaveHeader(char* save) {
 			return NULL;
 		}
 		if (ch.chunkType == 'IFhd') {
-			if (13 != fread(&header.IFhd,1,13,f)) {
+			if (sizeof(struct IFhd) != fread(&header.IFhd,1,sizeof(struct IFhd),f)) {
 				fclose(f);
 				return NULL;
 			}
