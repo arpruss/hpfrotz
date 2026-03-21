@@ -26,18 +26,22 @@
 
 #include "hpfrotz.h"
 
-#define MAX_PICK_FILES 36
-#define PICK_FILES_PER_LINE 4
+#define MAX_PICK_FILES 126
+static uint16_t pickFileList[MAX_PICK_FILES];
+static uint16_t numPickFiles;
+static int pickFlag;
+static char** pickExtData;
+static short pickNumExts;
 
 extern f_setup_t f_setup;
 
 #define HISTORY_BUFFER_SIZE 2048
-uint16_t historyCursor;
-uint16_t historyCursorOffset;
-uint16_t historyLength;
-uint16_t historyLastOffset;
-uint16_t numInHistory;
-zchar history[HISTORY_BUFFER_SIZE];
+static uint16_t historyCursor;
+static uint16_t historyCursorOffset;
+static uint16_t historyLength;
+static uint16_t historyLastOffset;
+static uint16_t numInHistory;
+static zchar history[HISTORY_BUFFER_SIZE];
 
 static int speed_100 = 100;
 
@@ -507,75 +511,47 @@ char right_type(DirEntry_t* d, char** extList, int numExts) {
 	return 0;
 }
 
-char pick_file(char* name, char** extData, int numExts) {
+static unsigned short pickFileLoader(void) {
 	DirEntry_t d;
-	
-	while(1) {
-		int i=0;
-		int pos = 0;
-		if (HARDWARE_STATUS_NO_DISK & *HARDWARE_STATUS) {
-			putText("Please insert a disk.\n");
-			while (HARDWARE_STATUS_NO_DISK & *HARDWARE_STATUS) {
-				if (kbhit()) {
-					char c = getch();
-					if (c == KEYBOARD_BREAK || c == 27)
-						return 0;
-				}
-			}
+	int i = 0;
+	numPickFiles = 0;
+	while (-1 != getDirEntry(i, &d) && numPickFiles < MAX_PICK_FILES) {
+		if (right_type(&d, pickExtData, pickNumExts)) {
+			pickFileList[numPickFiles++] = i;
 		}
-			
-		while (-1 != getDirEntry(i, &d) && pos < 36) {
-			if (right_type(&d, extData, numExts)) {
-				char c;
-				if (pos < 10)
-					c = '0'+pos;
-				else
-					c = 'A'+(pos-10);
-				if (i>0 && pos%4==0)
-					putText("\n");
-				printf("[%c] %-10s  ", c, d.name);
-				pos++;
-			}
-			i++;
-		}
-		putText("\nPlease select a file or press STOP/ESC to type a name.\n");
-		while ((HARDWARE_STATUS_OLD_DISK & *HARDWARE_STATUS) && ! kbhit()) ;
-		if (0 == (HARDWARE_STATUS_OLD_DISK & *HARDWARE_STATUS)) {
-			if (kbhit()) getch();
-			continue;
-		}
-		else {
-			char c = getch();
-			if (c == KEYBOARD_BREAK || c == 27)
-				return 0;
-			short seekPos;
-			if ('0' <= c && c <= '9')
-				seekPos = c - '0';
-			else if ('a' <= c && c <= 'z')
-				seekPos = c - 'a' + 10;
-			else if ('A' <= c && c <= 'Z')
-				seekPos = c - 'A' + 10;
-			else
-				continue;
- 			pos = 0;
-			i = 0;
-			while (-1 != getDirEntry(i, &d) && pos < 36) {
-				if (right_type(&d, extData, numExts)) {
-					if (pos == seekPos) {
-						strncpy(name, d.name, MAX_FILE_NAME + 1);
-						name[MAX_FILE_NAME] = 0;
-						putText("Selected: ");
-						putText(d.name);
-						putText(".\n");
-						return 1;
-					}
-					pos++;
-				}
-				i++;
-			}
-		}
+		i++;
 	}
-	return 0;
+	return numPickFiles;
+}
+
+static char* pickFileNamer(unsigned short i) {
+	DirEntry_t d;
+	static char name[MAX_FILE_NAME+1];
+	
+	if (-1 != getDirEntry(pickFileList[i], &d)) {
+		strcpy(name, d.name);
+		return name;
+	}
+	else {
+		return "";
+	}
+}
+
+uint8_t pick_file(char* name, char** extData, short numExts, int flag) {
+	pickFlag = flag;
+	pickExtData = extData;
+	pickNumExts = numExts;
+	
+	short i = hpChooser(1, 1, WIN_X2-WIN_X1-2, WIN_Y2-WIN_Y1-2, 2, 10, 1, pickFileLoader, pickFileNamer);	
+	
+	if (i < 0)
+		return 0;
+	
+	char* n = pickFileNamer(i);
+	if (*n == 0)
+		return 0;
+	strcpy(name, n);
+	return 1;
 }
 
 
@@ -596,30 +572,33 @@ char *hp_read_file_name (const char *default_name, int flag) {
 	if (f_setup.restore_mode) {
 		/* Caller always strdups */
 		strcpy(file_name, default_name);
-		printf("<%s>\n", file_name);
-		waitSeconds(2);
 		return file_name;
-	} else if (flag == FILE_NO_PROMPT) {
+	} 
+	
+	hp_set_window();
+	
+	if (flag == FILE_NO_PROMPT) {
 		ext = strrchr(default_name, '.');
-		if (strncmp(ext, EXT_AUX, 4)) {
+		if (ext == NULL || strncmp(ext, EXT_AUX, 4)) {
+			hp_clear_window();
 			os_warn("Blocked unprompted access of %s. Should only be %s files.", default_name, EXT_AUX);
-			free(ext);
 			return NULL;
 		}
-		free(ext);
 		buf = strndup(default_name, MAX_FILE_NAME - EXT_LENGTH);
 	} else {
 		if (flag == FILE_RESTORE || flag == FILE_LOAD_AUX) {
 			char *ext = (flag == FILE_RESTORE) ? EXT_SAVE : EXT_AUX;
-			if (pick_file(file_name, &ext,1)) {
-				return file_name;
-			}
+			uint8_t r = pick_file(file_name, &ext, 1, flag);
+			hp_clear_window();
+			return r ? file_name : NULL;
 		}
 		
 		sprintf(prompt, "Please enter a filename [%s]: ", default_name);
 
-		if (hp_read_misc_line(fullpath, prompt, MAX_FILE_NAME - 4 + 1) < 0)
+		if (hp_read_misc_line(fullpath, prompt, MAX_FILE_NAME - 4 + 1) < 0) {
+			hp_clear_window();
 			return NULL;
+		}
 
 		/* If using default filename... */
 		freebuf = TRUE;
@@ -632,6 +611,7 @@ char *hp_read_file_name (const char *default_name, int flag) {
 			printf("Filename too long\n");
 			delayTicks(30);
 			free(buf);
+			hp_clear_window();
 			return NULL;
 		}
 	}
@@ -673,9 +653,11 @@ char *hp_read_file_name (const char *default_name, int flag) {
 		int c = getch();
 		putChar(c);
 		if (tolower(c) != 'y') {
+			hp_clear_window();
 			return NULL;
 		}
 	}
+	hp_clear_window();
 	return file_name;
 }
 
@@ -716,9 +698,7 @@ char *os_read_file_name(const char *default_name, int flag)
 		strncpy(fixed_name, default_name, baseLen);
 		strcpy(fixed_name + baseLen, ext);
 	}
-	hp_set_window();
 	char* p = hp_read_file_name(fixed_name, flag);
-	hp_clear_window();
 
 	return p;
 } /* os_read_file_name */

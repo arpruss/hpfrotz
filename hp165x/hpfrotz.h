@@ -38,18 +38,20 @@
 #define MIN(x,y) ((x)<(y)) ? (x) : (y)
 #endif
 
+#define WIN_X1 8
+#define WIN_Y1 4
+#define WIN_X2 72
+#define WIN_Y2 22
+
 /* from ../common/setup.h */
 extern f_setup_t f_setup;
 
 extern bool quiet_mode;
 
-/* From input.c.  */
 bool is_terminator (zchar);
 
-/* dumb-input.c */
 void hp_init_input(void);
 
-/* dumb-output.c */
 void hp_init_output(void);
 bool dumb_output_handle_setting(const char *setting, bool show_cursor,
 				bool startup);
@@ -78,7 +80,7 @@ bool dumb_init_pictures(void);
 #define INPUT_DEBUG (-104)
 #define INPUT_SEED (-105)
 
-char pick_file(char* name, char** extData, int numExts);
+uint8_t pick_file(char* name, char** extData, short numExts, int flag);
 int16_t getTextContinuable(char* _buffer, uint16_t _maxSize, int timeoutTicks, bool continued, bool cancelable);
 
 #endif

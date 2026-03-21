@@ -153,17 +153,10 @@ void os_process_arguments(int _argc, char *_argv[])
 	static char story[MAX_FILE_NAME+1];
 	static char save[MAX_FILE_NAME+1];
 	hp_set_window();
-	if (!pick_file(story,storyExts,sizeof(storyExts)/sizeof(*storyExts))) {
-		putText("Please enter a filename: ");
-
-		*story = 0;
-		int16_t r = getTextContinuable(story, MAX_FILE_NAME+1, 0, 0, 1);
-		putText("\n");
-
-		if (*story == 0 || r == INPUT_STOP) {
-			putText("Goodbye!\n");
-			os_quit(0);
-		}
+	if (!pick_file(story,storyExts,sizeof(storyExts)/sizeof(*storyExts),-1)) {
+		hp_clear_window();
+		putText("Goodbye!\n");
+		os_quit(0);
 	}
 	hp_clear_window();
 	
