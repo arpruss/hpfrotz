@@ -56,12 +56,6 @@ struct chunkHeader {
 	uint32_t size; // big endian, like HP
 };
 
-struct IFhd {
-	uint16_t release;
-	char serial[6];
-	uint16_t checksum;
-};
-
 static bool findStoryForHeader(char* story, struct IFhd* header) {
 	DirEntry_t d;
 	char buffer[0x20];
@@ -88,7 +82,7 @@ static bool findStoryForHeader(char* story, struct IFhd* header) {
 	return 0;
 }
 
-static struct IFhd* getSaveHeader(char* save) {
+struct IFhd* getSaveHeader(char* save) {
 	struct chunkHeader ch;
 	
 	static union {

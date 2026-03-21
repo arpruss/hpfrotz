@@ -82,5 +82,11 @@ bool dumb_init_pictures(void);
 
 uint8_t pick_file(char* name, char** extData, short numExts, int flag);
 int16_t getTextContinuable(char* _buffer, uint16_t _maxSize, int timeoutTicks, bool continued, bool cancelable);
+struct IFhd {
+	uint16_t release;
+	char serial[6];
+	uint16_t checksum;
+};
+struct IFhd* getSaveHeader(char* save);
 
 #endif

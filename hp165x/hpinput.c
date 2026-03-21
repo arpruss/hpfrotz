@@ -517,7 +517,16 @@ static unsigned short pickFileLoader(void) {
 	numPickFiles = 0;
 	while (-1 != getDirEntry(i, &d) && numPickFiles < MAX_PICK_FILES) {
 		if (right_type(&d, pickExtData, pickNumExts)) {
-			pickFileList[numPickFiles++] = i;
+			if (pickFlag == FILE_RESTORE) {
+				struct IFhd* h = getSaveHeader(d.name);
+				if (h != NULL && h->release == z_header.release &&
+					h->checksum == z_header.checksum &&
+					!memcmp(h->serial, zmp+H_SERIAL, 6))
+					pickFileList[numPickFiles++] = i;
+			}
+			else {
+				pickFileList[numPickFiles++] = i;
+			}
 		}
 		i++;
 	}
