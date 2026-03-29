@@ -484,9 +484,11 @@ zchar os_read_key (int timeout, bool show_cursor)
 	if (timeout) {
 		start_time = timeTenths();
 	}
+	
+	InputEvent_t e;
 
 	while(1) {
-		while (! kbhit()) {
+		while (! getInputEvent(&e)) {
 			if (timeout) {
 				int elapsed = (timeTenths() - start_time) * speed_100 / 100;
 				if (elapsed > timeout) {
@@ -494,7 +496,18 @@ zchar os_read_key (int timeout, bool show_cursor)
 				}
 			}
 		}
-		return translate_key(getch());
+		if (e.type == INPUT_KEY)
+			return translate_key(e.data.key.character);
+		else if (e.type == INPUT_MOUSE) {
+			mouse_x = 1 + e.data.mouse.x / getFontWidth();
+			mouse_y = 1 + e.data.mouse.y / getFontHeight();
+			if ((e.data.mouse.buttons & MOUSE_DOUBLE_CLICK) && (e.data.mouse.buttonDifference & MOUSE_DOUBLE_CLICK) ) {
+				return ZC_DOUBLE_CLICK;				
+			}
+			else if ((e.data.mouse.buttons & MOUSE_BUTTON_LEFT) && (e.data.mouse.buttonDifference & MOUSE_BUTTON_LEFT) ) {
+				return ZC_SINGLE_CLICK;				
+			}
+		}
 	}
 
 	/* TODO: error messages for invalid special chars.  */

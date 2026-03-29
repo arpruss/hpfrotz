@@ -164,7 +164,10 @@ void os_set_colour (int newfg, int newbg)
 void os_display_char (zchar c)
 {
 	if (c >= ZC_LATIN1_MIN) {
-		putChar(latin1_to_ibm[c - ZC_LATIN1_MIN]);
+		if (story_id != BEYOND_ZORK)
+			putChar(latin1_to_ibm[c - ZC_LATIN1_MIN]);
+		else
+			putChar(c);
 	} else if (c >= 32 && c <= 126) {
 		putChar(c);
 	} else if (c == ZC_GAP) {
@@ -324,6 +327,15 @@ void hp_init_output(void) {
 
 	if (z_header.version >= V5) {
 		z_header.flags &= ~SOUND_FLAG;
+	}
+
+	if (story_id == BEYOND_ZORK) {
+		z_header.interpreter_number = INTERP_MSDOS;
+		z_header.interpreter_version = 'F';
+	}
+	
+	if (story_id == JOURNEY || story_id == BEYOND_ZORK) {
+		setMouseCursor(mouseArrow, WRITE_SET_ATTR, WRITE_CLEAR_ATTR, 30);		
 	}
 
 	z_header.font_width = 1; 
