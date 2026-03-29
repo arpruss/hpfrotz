@@ -1,8 +1,8 @@
 make
-if [ -e e:/DSKA0005.HFE ] ; then
- hfe=e:/DSKA0005.HFE
+if [ -e e:/DSKA0005-Frotz.HFE ] ; then
+ hfe=e:/DSKA0005-Frotz.HFE
 else
- hfe=d:/DSKA0005.HFE
+ hfe=d:/DSKA0005-Frotz.HFE
 fi
 python ../../buildbinary.py bmbinary.s68 hpfrotz.bin
 python ../../lifutils.py put $hfe hpfrotz.bin SYSTEM_ c001

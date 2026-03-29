@@ -58,6 +58,31 @@ static char singleLine;
 static uint16_t maxSize;
 static char afterHotkey = 0;
 
+static struct {
+	char c;
+	uint8_t zc;
+} key_table[] = {
+	{ '\b', ZC_BACKSPACE },
+	{ '\n', ZC_RETURN },
+	{ '\r', ZC_RETURN },
+	{ 27, ZC_ESCAPE },
+	{ KEYBOARD_UP, ZC_ARROW_MIN },
+	{ KEYBOARD_DOWN, ZC_ARROW_MIN+1 },
+	{ KEYBOARD_LEFT, ZC_ARROW_MIN+2 },
+	{ KEYBOARD_RIGHT, ZC_ARROW_MIN+3 },
+	{ KEYBOARD_F1, ZC_FKEY_MIN },
+	{ KEYBOARD_F1+1, ZC_FKEY_MIN+1 },
+	{ KEYBOARD_F1+2, ZC_FKEY_MIN+2 },
+	{ KEYBOARD_F1+3, ZC_FKEY_MIN+3 },
+	{ KEYBOARD_F1+4, ZC_FKEY_MIN+4 },
+	{ KEYBOARD_F1+5, ZC_FKEY_MIN+5 },
+	{ KEYBOARD_F1+6, ZC_FKEY_MIN+6 },
+	{ KEYBOARD_F1+7, ZC_FKEY_MIN+7 },
+	{ KEYBOARD_F1+8, ZC_FKEY_MIN+8 },
+	{ KEYBOARD_F1+9, ZC_FKEY_MIN+9 }, // todo: numpad, mouse
+};
+
+
 static void setXYFromOffset(uint16_t offset) {
 	uint16_t p = startX + offset;
 	uint16_t row = startY + p / cols;
@@ -214,8 +239,6 @@ int16_t getTextContinuable(char* _buffer, uint16_t _maxSize, int timeoutTicks, b
 	uint32_t endTime = 0;
 	
 	if (0<timeoutTicks) {
-		if (getVBLCounter()==(uint32_t)(-1))
-			patchVBL();
 		endTime = getVBLCounter() + timeoutTicks;
 	}
 	
@@ -444,6 +467,14 @@ static int16_t hp_read_misc_line(char *s, char *prompt, uint16_t length)
 	return result;
 } /* hp_read_misc_line */
 
+static zchar translate_key(uint8_t c) {
+	if (32 <= c && c <= 126)
+		return c;
+	for (uint16_t i=0; i<sizeof(key_table)/sizeof(*key_table); i++)
+		if (key_table[i].c == c)
+			return key_table[i].zc;
+	return c;
+}
 
 // TODO: support show_cursor
 zchar os_read_key (int timeout, bool show_cursor)
@@ -453,17 +484,18 @@ zchar os_read_key (int timeout, bool show_cursor)
 	if (timeout) {
 		start_time = timeTenths();
 	}
-	
-	while (! kbhit()) {
-		if (timeout) {
-			int elapsed = (timeTenths() - start_time) * speed_100 / 100;
-			if (elapsed > timeout) {
-				return ZC_TIME_OUT;
+
+	while(1) {
+		while (! kbhit()) {
+			if (timeout) {
+				int elapsed = (timeTenths() - start_time) * speed_100 / 100;
+				if (elapsed > timeout) {
+					return ZC_TIME_OUT;
+				}
 			}
 		}
+		return translate_key(getch());
 	}
-	
-	return getch();
 
 	/* TODO: error messages for invalid special chars.  */
 } /* os_read_key */
@@ -659,7 +691,7 @@ char *hp_read_file_name (const char *default_name, int flag) {
 		&& ((fp = fopen(file_name, "rb")) != NULL)) {
 		fclose (fp);
 		putText("Overwrite existing file? ");
-		int c = getch();
+		char c = getch();
 		putChar(c);
 		if (tolower(c) != 'y') {
 			hp_clear_window();

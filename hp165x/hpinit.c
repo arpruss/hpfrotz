@@ -352,7 +352,6 @@ static void intro(void)
 
 void os_init_setup(void)
 {
-	patchVBL();
 	initScreen(392, BACKGROUND); 
 	tickRate = ticksPerSecond();
 	initKeyboard(1);
