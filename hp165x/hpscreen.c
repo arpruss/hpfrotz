@@ -139,7 +139,7 @@ bool os_repaint_window(int win, int ypos_old, int ypos_new, int xpos,
 
 int os_font_data(int font, int *height, int *width)
 {
-	if (font == TEXT_FONT) {
+	if (font == TEXT_FONT || font == GRAPHICS_FONT) {
 		*height = 1;
 		*width = 1;
 		return 1;
@@ -163,11 +163,10 @@ void os_set_colour (int newfg, int newbg)
 
 void os_display_char (zchar c)
 {
-	if (c >= ZC_LATIN1_MIN) {
-		if (story_id != BEYOND_ZORK)
-			putChar(latin1_to_ibm[c - ZC_LATIN1_MIN]);
-		else
-			putChar(c);
+	if (/*current_font == GRAPHICS_FONT && */ story_id == BEYOND_ZORK) {
+		putChar(c);
+	} else if (c >= ZC_LATIN1_MIN) {
+		putChar(latin1_to_ibm[c - ZC_LATIN1_MIN]);
 	} else if (c >= 32 && c <= 126) {
 		putChar(c);
 	} else if (c == ZC_GAP) {
@@ -232,8 +231,10 @@ int os_string_width (const zchar *s)
 	zchar c;
 
 	while ((c = *s++) != 0) {
-		if (c == ZC_NEW_STYLE || c == ZC_NEW_FONT)
+		if (c == ZC_NEW_STYLE)
 			s++;
+		else if (c == ZC_NEW_FONT)
+			os_set_font(*s++);
 		else
 			width += os_char_width(c);
 	}
@@ -329,12 +330,14 @@ void hp_init_output(void) {
 		z_header.flags &= ~SOUND_FLAG;
 	}
 
+	z_header.flags &= ~GRAPHICS_FLAG;
+
 	if (story_id == BEYOND_ZORK) {
 		z_header.interpreter_number = INTERP_MSDOS;
 		z_header.interpreter_version = 'F';
 	}
 	
-	if (story_id == JOURNEY || story_id == BEYOND_ZORK) {
+	if (/*story_id == JOURNEY || story_id == BEYOND_ZORK || */ (z_header.flags & MOUSE_FLAG)) {
 		setMouseCursor(mouseArrow, WRITE_SET_ATTR, WRITE_CLEAR_ATTR, 30);		
 	}
 

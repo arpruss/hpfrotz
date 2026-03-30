@@ -281,13 +281,32 @@ int16_t getTextContinuable(char* _buffer, uint16_t _maxSize, int timeoutTicks, b
 	drawCursor();
 	
 	while(1) {
-		while(!kbhit()) {
-			if ((length == 0 || *buffer!='\\') && 0 < timeoutTicks && endTime <= getVBLCounter()) {
+		InputEvent_t e;
+		while(!getInputEvent(&e)) {
+			if (0 < timeoutTicks && endTime <= getVBLCounter()) {
 				clearCursor();
 				return ERROR_TIMEOUT;
 			}
 		}
-		uint8_t c = getch();
+		if (e.type == INPUT_MOUSE) {
+			mouse_x = 1 + e.data.mouse.x / getFontWidth();
+			mouse_y = 1 + e.data.mouse.y / getFontHeight();
+			if ((e.data.mouse.buttons & e.data.mouse.buttonDifference & MOUSE_DOUBLE_CLICK)) {
+				clearCursor();
+				afterHotkey = 1;
+				return INPUT_MOUSE_DOUBLE_CLICK;
+			}
+			else if ((e.data.mouse.buttons & e.data.mouse.buttonDifference & MOUSE_BUTTON_LEFT)) {
+				clearCursor();
+				afterHotkey = 1;
+				return INPUT_MOUSE_CLICK;
+			}
+			continue;
+		}
+		else if (e.type != INPUT_KEY) {
+			continue;
+		}
+		uint8_t c = e.data.key.character;
 		switch(c) {
 			case '\n':
 			case '\r':
@@ -535,6 +554,10 @@ zchar os_read_line (int UNUSED (max), zchar *buf, int timeout, int UNUSED(width)
 			return ZC_HKEY_DEBUG;
 		case INPUT_SEED:
 			return ZC_HKEY_SEED;
+		case INPUT_MOUSE_CLICK:
+			return ZC_SINGLE_CLICK;
+		case INPUT_MOUSE_DOUBLE_CLICK:
+			return ZC_DOUBLE_CLICK;
 		default:
 			return 13;
 	}
@@ -766,7 +789,7 @@ void hp_init_input(void)
 		z_header.config |= CONFIG_TIMEDINPUT;
 
 	if (z_header.version >= V5)
-		z_header.flags &= ~(MOUSE_FLAG | MENU_FLAG);
+		z_header.flags &= ~MENU_FLAG;
 	
 	numInHistory = 0;
 	historyCursor = 0;

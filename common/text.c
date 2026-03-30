@@ -96,7 +96,7 @@ zchar translate_from_zscii(zbyte c)
 		} else
 			return '?';
 	}
-	return c;
+ 	return c;
 } /* translate_from_zscii */
 
 

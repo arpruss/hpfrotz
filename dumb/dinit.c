@@ -296,7 +296,9 @@ void os_init_screen(void)
 			6 ? INTERP_MSDOS : INTERP_DEC_20;
 	else
 		z_header.interpreter_number = f_setup.interpreter_number;
-
+	
+	z_header.interpreter_number = INTERP_MSDOS;
+	
 	z_header.interpreter_version = 'F';
 
 	dumb_init_input();

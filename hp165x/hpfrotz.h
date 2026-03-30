@@ -79,6 +79,8 @@ bool dumb_init_pictures(void);
 #define INPUT_RESTART (-103)
 #define INPUT_DEBUG (-104)
 #define INPUT_SEED (-105)
+#define INPUT_MOUSE_CLICK (-106)
+#define INPUT_MOUSE_DOUBLE_CLICK (-107)
 
 uint8_t pick_file(char* name, char** extData, short numExts, int flag);
 int16_t getTextContinuable(char* _buffer, uint16_t _maxSize, int timeoutTicks, bool continued, bool cancelable);

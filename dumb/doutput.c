@@ -30,6 +30,7 @@ static bool show_line_types = FALSE;
 static bool show_pictures = TRUE;
 static bool visual_bell = TRUE;
 static bool plain_ascii = FALSE;
+static zchar current_font = 0;
 
 static char latin1_to_ascii[] =
 	"    !   c   L   >o< Y   |   S   ''  C   a   <<  not -   R   _   "
@@ -560,6 +561,8 @@ static void dumb_copy_cell(int dest_row, int dest_col,
  */
 void os_display_char (zchar c)
 {
+	if (current_font == GRAPHICS_FONT)
+		printf("<%x>", c);
 	if (c >= ZC_LATIN1_MIN) {
 		if (plain_ascii) {
 			char *ptr = latin1_to_ascii + 4 * (c - ZC_LATIN1_MIN);
@@ -588,8 +591,9 @@ void os_display_string (const zchar *s)
 	zchar c;
 
 	while ((c = *s++) != 0) {
-		if (c == ZC_NEW_FONT)
-			s++;
+		if (c == ZC_NEW_FONT) {
+			os_set_font(*s++);
+		}
 		else if (c == ZC_NEW_STYLE)
 			os_set_text_style(*s++);
 		else {
@@ -635,7 +639,7 @@ void os_scroll_area (int top, int left, int bottom, int right, int units)
 
 int os_font_data(int font, int *height, int *width)
 {
-	if (font == TEXT_FONT) {
+	if (font == TEXT_FONT || font == GRAPHICS_FONT) {
 		*height = 1;
 		*width = 1;
 		return 1;
@@ -667,7 +671,9 @@ void os_beep (int volume)
 
 
 /* To make the common code happy */
-void os_set_font (int UNUSED (x)) {}
+void os_set_font (int x) {
+	current_font = x;
+}
 void os_init_sound(void) {}
 void os_prepare_sample (int UNUSED (a)) {}
 void os_finish_with_sample (int UNUSED (a)) {}
