@@ -63,9 +63,9 @@ static bool findStoryForHeader(char* story, struct IFhd* header) {
 	uint16_t i = 0;
 	while (-1 != getDirEntry(i, &d)) {
 		if (right_type(&d, storyExts, sizeof storyExts / sizeof *storyExts)) {
-			hpPosixSetBufferedReadMaximum(0);
+			//hpPosixSetBufferedReadMaximum(0);
 			FILE* f = fopen(d.name, "rb");
-			hpPosixSetBufferedReadMaximum(DEFAULT_BUFFERED_READ_MAXIMUM);
+			//hpPosixSetBufferedReadMaximum(DEFAULT_BUFFERED_READ_MAXIMUM);
 			if (f != NULL) {
 				int32_t n = fread(buffer, 1, 0x20, f);
 				fclose(f);
@@ -310,7 +310,7 @@ FILE *os_load_story(void)
 {
 	/* this is a large file, so don't buffer it all into memory;
 		instead, open and reopen it as needed */
-	hpPosixSetBufferedReadMaximum(100000);
+	//hpPosixSetBufferedReadMaximum(100000);
 	FILE* f = fopen(f_setup.story_file, "rb");
 	return f;
 } /* os_load_story */
