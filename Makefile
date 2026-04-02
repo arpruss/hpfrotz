@@ -2,7 +2,7 @@ SRCS=common/buffer.c common/err.c common/fastmem.c common/files.c common/getopt.
 common/main.c common/math.c common/missing.c common/object.c common/process.c common/quetzal.c \
 common/random.c common/redirect.c common/screen.c common/sound.c common/stream.c common/table.c \
 common/text.c common/variable.c hp165x/hpinit.c \
-hp165x/hpscreen.c hp165x/hpinput.c
+hp165x/hpscreen.c hp165x/hpinput.c hp165x/hppic.c
 
 
 CPU=68000

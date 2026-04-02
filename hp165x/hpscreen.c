@@ -330,14 +330,20 @@ void hp_init_output(void) {
 		z_header.flags &= ~SOUND_FLAG;
 	}
 
-	z_header.flags &= ~GRAPHICS_FLAG;
+	//z_header.flags &= ~GRAPHICS_FLAG;
+	if (story_id != JOURNEY)
+		z_header.flags &= ~GRAPHICS_FLAG;
+	else {
+		z_header.flags |= GRAPHICS_FLAG;
+		z_header.interpreter_number = INTERP_MACINTOSH;
+	}
 
 	if (story_id == BEYOND_ZORK) {
 		z_header.interpreter_number = INTERP_MSDOS;
 		z_header.interpreter_version = 'F';
 	}
 	
-	if (/*story_id == JOURNEY || story_id == BEYOND_ZORK || */ (z_header.flags & MOUSE_FLAG)) {
+	if (z_header.flags & MOUSE_FLAG) {
 		setMouseCursor(mouseArrow, WRITE_SET_ATTR, WRITE_CLEAR_ATTR, 30);		
 	}
 
@@ -350,6 +356,3 @@ void hp_init_output(void) {
 	os_erase_area(1, 1, z_header.screen_rows, z_header.screen_cols, -2);
 }	
 
-bool os_picture_data(int num, int *height, int *width){return FALSE;}
-void os_draw_picture (int num, int row, int col){}
-int os_peek_colour (void) {return BLACK_COLOUR; }

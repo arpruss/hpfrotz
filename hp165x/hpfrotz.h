@@ -89,6 +89,6 @@ struct IFhd {
 	char serial[6];
 	uint16_t checksum;
 };
-struct IFhd* getSaveHeader(char* save);
+struct IFhd* getSaveHeader(const char* save);
 
 #endif
