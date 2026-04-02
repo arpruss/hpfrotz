@@ -84,7 +84,7 @@ void hp_init_pictures(void) {
 	if (picFile == NULL) 
 		goto ERROR;
 	
-	f_setup.blorb_file = picFile; // NOT ACTUALLY A BLORB FILE, BUT STOPS WARNINGS
+	f_setup.blorb_file = "picFile"; // NOT ACTUALLY A BLORB FILE, BUT STOPS WARNINGS
 	
 	if (1 != fread(&header, sizeof(header), 1, picFile)) 
 		goto ERROR;
@@ -134,7 +134,9 @@ bool os_picture_data(int num, int *height, int *width){
 	}
 }	
 
+
 /* Huffman decompression code from Spatterlight */
+
 
 void drawImage(uint16_t x, uint16_t y, struct picture_directory* pd) {
 	fseek(picFile, pd->data_address, SEEK_SET);
@@ -151,9 +153,9 @@ void drawImage(uint16_t x, uint16_t y, struct picture_directory* pd) {
 	
 	uint16_t width = pd->width;
 	uint16_t height = pd->height;
-	uint32_t finalsize = width * (uint32_t)height;
-	uint8_t* image = malloc(finalsize);
-	if (image == NULL) {
+	uint8_t* line = malloc(width);
+	uint16_t index = 0;
+	if (line == NULL) {
 		free(data);
 		return;
 	}
@@ -161,10 +163,18 @@ void drawImage(uint16_t x, uint16_t y, struct picture_directory* pd) {
 	int j = 0;
     unsigned char repeats = 0;
     unsigned char color_index = 0;
-	
+
+	uint16_t lineSize = getScreenWidth()/4;
+	volatile uint16_t* posTop = SCREEN + y * lineSize + (x/4)*2;
+	uint8_t startMask = 1 << (3-x%4);
+	uint16_t imageY = 0;
+	uint16_t imageX = 0;	
+	uint8_t mask = startMask;
+	volatile uint16_t* pos = posTop;
+	uint16_t stretchCount = 0;
 	
 	// colors 00, 02, 03
-    for (int i = 0; i < finalsize; i++, repeats--) {
+	while (1) {
         if (repeats == 0) {
             // Repeat while bit 7 of count is unset
             while (repeats < 0x80) {
@@ -200,60 +210,51 @@ void drawImage(uint16_t x, uint16_t y, struct picture_directory* pd) {
             }
         }
 
-        image[i] = color_index;
-    }
+		repeats--;
+		uint8_t pixel = (imageY == 0) ? color_index : (color_index ^ line[imageX]);
+		line[imageX] = pixel;
 
-    // XOR with the corresponding byte in the line above
-    for (unsigned i = width; i < finalsize; i++) {
-        image[i] ^= image[i - width];
-    }
-
-#if STRETCH_NUM > STRETCH_DEN	
-	uint16_t stretchCount = 0;
-#endif	
-	uint8_t* p = image;
-	uint16_t lineSize = getScreenWidth()/4;
-	volatile uint16_t* posTop = SCREEN + y * lineSize + (x/4)*2;
-	uint8_t startMask = 1 << (3-x%4);
-	
-	for (uint16_t imageY = 0 ; imageY < height ; imageY++) {
-		volatile uint16_t* pos = posTop + imageY * lineSize;
-		uint8_t mask = startMask;
-		
-		for (uint16_t imageX = 0 ; imageX < width ; imageX++) {
-			if (*p != 0) {
-				if (*p == 2) {
-					*SCREEN_MEMORY_CONTROL = WRITE_WHITE;
-				}
-				else if (*p == 3) {
-					*SCREEN_MEMORY_CONTROL = WRITE_BLACK;
-				}
-				*pos = mask;
+		if (pixel != 0) {
+			if (pixel == 2) {
+				*SCREEN_MEMORY_CONTROL = WRITE_WHITE;
 			}
+			else if (pixel == 3) {
+				*SCREEN_MEMORY_CONTROL = WRITE_BLACK;
+			}
+			*pos = mask;
+		}
+		mask >>= 1;
+		if (mask == 0) {
+			pos++;
+			mask = 8;
+		}
+#if STRETCH_NUM > STRETCH_DEN
+		stretchCount += (STRETCH_NUM-STRETCH_DEN);
+		if (stretchCount >= STRETCH_DEN) {
+			if (pixel != 0)
+				*pos = mask;
 			mask >>= 1;
 			if (mask == 0) {
 				pos++;
 				mask = 8;
 			}
-
-#if STRETCH_NUM > STRETCH_DEN
-			stretchCount += (STRETCH_NUM-STRETCH_DEN);
-			if (stretchCount >= STRETCH_DEN) {
-				if (*p != 0)
-					*pos = mask;
-				mask >>= 1;
-				if (mask == 0) {
-					pos++;
-					mask = 8;
-				}
-				stretchCount -= STRETCH_DEN;
-			}
+			stretchCount -= STRETCH_DEN;
+		}
 #endif
-			p++;
+		imageX++;
+		if (imageX >= width) {
+			imageX = 0;
+			imageY++;
+			mask = startMask;
+			pos = posTop + imageY * lineSize;
+			stretchCount = 0;
+			if (imageY >= height)
+				break;
 		}
 	}
+
 ERROR:	
-	free(image);
+	free(line);
 	free(data);
 }
 
