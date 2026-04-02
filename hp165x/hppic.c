@@ -78,6 +78,8 @@ void hp_init_pictures(void) {
 	if (picFile == NULL) 
 		goto ERROR;
 	
+	f_setup.blorb_file = picFile; // NOT ACTUALLY A BLORB FILE, BUT STOPS WARNINGS
+	
 	if (1 != fread(&header, sizeof(header), 1, picFile)) 
 		goto ERROR;
 
