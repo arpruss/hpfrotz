@@ -26,6 +26,12 @@
 
 #include "hpfrotz.h"
 
+//pixel size: 0.2754mm x 0.3258mm
+//pixel height to width: 1.18:1
+
+#define STRETCH_NUM   118
+#define STRETCH_DEN   100
+
 static FILE* picFile = NULL;
 
 static struct picture_directory {
@@ -116,7 +122,7 @@ bool os_picture_data(int num, int *height, int *width){
 		for (unsigned short i=0; i<header.count; i++, pd++) 
 			if (directory[i].number == num) {
 				*height = (directory[i].height + fontHeight - 1) / fontHeight;
-				*width = (directory[i].width + fontWidth - 1) / fontWidth;
+				*width = (directory[i].width * STRETCH_NUM / STRETCH_DEN + fontWidth - 1) / fontWidth;
 				return 1;
 			}
 		return 0;
@@ -155,6 +161,7 @@ void drawImage(uint16_t x, uint16_t y, struct picture_directory* pd) {
 	int j = 0;
     unsigned char repeats = 0;
     unsigned char color_index = 0;
+	
 	
 	// colors 00, 02, 03
     for (int i = 0; i < finalsize; i++, repeats--) {
@@ -200,11 +207,18 @@ void drawImage(uint16_t x, uint16_t y, struct picture_directory* pd) {
     for (unsigned i = width; i < finalsize; i++) {
         image[i] ^= image[i - width];
     }
-		
+
+#if STRETCH_NUM > STRETCH_DEN	
+	uint16_t stretchCount = 0;
+#endif	
 	uint8_t* p = image;
+	uint16_t lineSize = getScreenWidth()/4;
+	volatile uint16_t* posTop = SCREEN + y * lineSize + (x/4)*2;
+	uint8_t startMask = 1 << (3-x%4);
+	
 	for (uint16_t imageY = 0 ; imageY < height ; imageY++) {
-		volatile uint16_t* pos = SCREEN + (y+imageY) *(getScreenWidth()/4) + (x/4)*2;
-		uint8_t mask = 1 << (3-x%4);
+		volatile uint16_t* pos = posTop + imageY * lineSize;
+		uint8_t mask = startMask;
 		
 		for (uint16_t imageX = 0 ; imageX < width ; imageX++) {
 			if (*p != 0) {
@@ -221,6 +235,20 @@ void drawImage(uint16_t x, uint16_t y, struct picture_directory* pd) {
 				pos++;
 				mask = 8;
 			}
+
+#if STRETCH_NUM > STRETCH_DEN
+			stretchCount += (STRETCH_NUM-STRETCH_DEN);
+			if (stretchCount >= STRETCH_DEN) {
+				if (*p != 0)
+					*pos = mask;
+				mask >>= 1;
+				if (mask == 0) {
+					pos++;
+					mask = 8;
+				}
+				stretchCount -= STRETCH_DEN;
+			}
+#endif
 			p++;
 		}
 	}
