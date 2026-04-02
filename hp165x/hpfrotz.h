@@ -53,22 +53,12 @@ bool is_terminator (zchar);
 void hp_init_input(void);
 
 void hp_init_output(void);
-bool dumb_output_handle_setting(const char *setting, bool show_cursor,
-				bool startup);
-void dumb_show_screen(bool show_cursor);
-void dumb_show_prompt(bool show_cursor, char line_type);
-void dumb_dump_screen(void);
-void dumb_display_user_input(char *);
-void dumb_discard_old_input(int num_chars);
-void dumb_elide_more_prompt(void);
-void dumb_set_picture_cell(int row, int col, zchar c);
 
 void hp_set_window(void);
 void hp_clear_window(void);
 char right_type(DirEntry_t* d, char** extList, int numExts);
-
-/* dumb-pic.c */
-bool dumb_init_pictures(void);
+void hp_init_pictures(void);
+void hp_close_pictures(void);
 
 #define FOREGROUND WRITE_WHITE
 #define BACKGROUND WRITE_BLACK

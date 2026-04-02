@@ -195,6 +195,7 @@ void os_display_string (const zchar *s)
 void os_reset_screen() {
 	os_set_font(TEXT_FONT);
 	os_set_text_style(0);
+	hp_close_pictures();
 	os_display_string((zchar *) "[Hit any key to exit.]");
 	os_read_key(0, TRUE);
 }
@@ -353,6 +354,9 @@ void hp_init_output(void) {
 	z_header.screen_width = z_header.screen_cols;
 	z_header.default_foreground = WHITE_COLOUR;
 	z_header.default_background = BLACK_COLOUR;
+	
+	hp_init_pictures();
+	
 	os_erase_area(1, 1, z_header.screen_rows, z_header.screen_cols, -2);
 }	
 
