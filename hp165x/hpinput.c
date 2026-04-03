@@ -619,7 +619,7 @@ uint8_t pick_file(char* name, char** extData, short numExts, int flag) {
 	pickExtData = extData;
 	pickNumExts = numExts;
 	
-	short i = hpChooser(1, 1, WIN_X2-WIN_X1-2, WIN_Y2-WIN_Y1-2, 2, 10, 1, pickFileLoader, pickFileNamer);	
+	short i = hpChooser(1, 1, WIN_X2-WIN_X1-2, WIN_Y2-WIN_Y1-2, 2, 10, pickFileLoader, pickFileNamer, CHOOSER_DISK_BASED);
 	
 	if (i < 0)
 		return 0;

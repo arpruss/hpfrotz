@@ -345,7 +345,7 @@ void hp_init_output(void) {
 	}
 	
 	if (z_header.flags & MOUSE_FLAG) {
-		setMouseCursor(mouseArrow, WRITE_SET_ATTR, WRITE_CLEAR_ATTR, 30);		
+		setMouseCursor(mouseArrow, WRITE_SET_ATTR, WRITE_CLEAR_ATTR, 30);
 	}
 
 	z_header.font_width = 1; 
