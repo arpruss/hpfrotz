@@ -33,7 +33,7 @@
 
 #define STRETCH_NUM   118
 #define STRETCH_DEN   100
-#define FILE_BUFFER_SIZE   512
+#define FILE_BUFFER_SIZE   128
 
 static FILE* picFile = NULL;
 

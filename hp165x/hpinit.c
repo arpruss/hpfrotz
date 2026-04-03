@@ -340,8 +340,8 @@ static void intro(void)
 	printf("  Frotz was originally written by Stefan Jokisch.\n");
 	printf("  It complies with standard 1.1 of the Z-Machine Standard.\n");
 	printf("  It was ported to Unix by Galen Hazelwood.\n");
-	printf("  It is distributed under the GNU General Public License version 3\n");// or\n");
-//	printf("    (at your option) any later version.\n");
+	printf("  It is distributed under the GNU General Public License version 2 or\n");
+	printf("    (at your option) any later version.\n");
 	printf("  This software is offered as-is with no warranty or liability.\n");
 	printf("  The HP 1652B/1653B port is maintained by Alexander Pruss.\n");
 	printf("  Frotz's homepage is https://661.org/proj/if/frotz.\n\n");
