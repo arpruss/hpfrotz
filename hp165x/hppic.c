@@ -18,6 +18,7 @@
  */
 
 // currently only implemented for Journey
+// Uses Huffman decompression code based on Spatterlight's
 
 #include <hp165x.h>
 #include <string.h>
@@ -25,12 +26,14 @@
 #include <stdio.h>
 
 #include "hpfrotz.h"
+#include <hpposix.h>
 
 //pixel size: 0.2754mm x 0.3258mm
 //pixel height to width: 1.18:1
 
 #define STRETCH_NUM   118
 #define STRETCH_DEN   100
+#define FILE_BUFFER_SIZE   512
 
 static FILE* picFile = NULL;
 
@@ -134,33 +137,25 @@ bool os_picture_data(int num, int *height, int *width){
 	}
 }	
 
-
 /* Huffman decompression code from Spatterlight */
-
 
 void drawImage(uint16_t x, uint16_t y, struct picture_directory* pd) {
 	fseek(picFile, pd->data_address, SEEK_SET);
-	uint32_t compressedSize = 0;
-	fread(1+(char*)&compressedSize, 3, 1, picFile);
+	uint32_t remainingSize = 0;
+	fread(1+(char*)&remainingSize, 3, 1, picFile);
 	fseek(picFile, 3, SEEK_CUR);
-	uint8_t* data = malloc(compressedSize);
-	if (data == NULL)
-		return;
-	if (compressedSize != fread(data, 1, compressedSize, picFile)) {
-		free(data);
-		return;
-	}
-	
+	uint32_t bufpos = 0;
+
 	uint16_t width = pd->width;
 	uint16_t height = pd->height;
-	uint8_t* line = malloc(width);
-	uint16_t index = 0;
-	if (line == NULL) {
-		free(data);
+	uint8_t* buffer = malloc(FILE_BUFFER_SIZE + width);
+	if (buffer == NULL)
 		return;
-	}
+	// store both input and output in one chunk to save memory and be
+	// more efficient
+	uint8_t* line = buffer+FILE_BUFFER_SIZE;
+
     uint8_t bit = 7;
-	int j = 0;
     unsigned char repeats = 0;
     unsigned char color_index = 0;
 
@@ -172,29 +167,44 @@ void drawImage(uint16_t x, uint16_t y, struct picture_directory* pd) {
 	uint8_t mask = startMask;
 	volatile uint16_t* pos = posTop;
 	uint16_t stretchCount = 0;
-	
-	// colors 00, 02, 03
+
+	uint16_t inBuffer = 0;
+	uint16_t bufferIndex = 0;
+	uint16_t toRead;
+
 	while (1) {
         if (repeats == 0) {
             // Repeat while bit 7 of count is unset
             while (repeats < 0x80) {
+				if (bufferIndex >= inBuffer) {
+					if (remainingSize == 0)
+						goto DONE; // ERROR!
+					if (remainingSize <= FILE_BUFFER_SIZE)
+						toRead = remainingSize;
+					else
+						toRead = FILE_BUFFER_SIZE;
+					inBuffer = fread(buffer, 1, toRead, picFile);
+					if (inBuffer == 0)
+						goto DONE; // ERROR
+					inBuffer = toRead;
+					bufpos += toRead;
+					remainingSize -= inBuffer;
+					bufferIndex = 0;
+				}
                 // This conditional is inverted in
                 // the Magnetic code in ms_extract1().
                 // That code will add 1 and read from the subsequent
                 // byte in the array if the bit is *unset*.
                 // Here we do that if the bit is *set*.
-                if (data[j] & (1 << bit)) {
+                if (buffer[bufferIndex] & (1 << bit)) {
                     repeats = tree[2 * repeats + 1];
                 } else {
                     repeats = tree[2 * repeats];
                 }
 
-                if (!bit)
-                    j++;
-
-                if (j > compressedSize) {
-					goto ERROR;
-                }
+                if (!bit) {
+                    bufferIndex++;
+				}
 
                 bit = bit ? bit - 1 : 7;
             }
@@ -253,9 +263,8 @@ void drawImage(uint16_t x, uint16_t y, struct picture_directory* pd) {
 		}
 	}
 
-ERROR:	
-	free(line);
-	free(data);
+DONE:
+	free(buffer);
 }
 
 void os_draw_picture (int num, int row, int col){

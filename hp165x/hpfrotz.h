@@ -13,6 +13,7 @@
 
 #include <hp165x.h>
 
+#include <sys/param.h>
 #include "../common/frotz.h"
 
 #ifndef NO_BASENAME
@@ -25,8 +26,6 @@
 #include <string.h>
 #include <ctype.h>
 #include <time.h>
-
-#include <sys/param.h>
 
 #define fprintf(stream,...) printf(__VA_ARGS__)
 #define vfprintf(stream,s,m) printf(s,m)
