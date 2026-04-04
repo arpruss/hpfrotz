@@ -70,7 +70,8 @@ static uint16_t fontHeight;
 static void getStretches(uint16_t imageWidth, uint16_t imageHeight, uint16_t* xDeltaP,
 	uint16_t* xDenominatorP, uint16_t* yDeltaP, uint16_t* yDenominatorP) {
 	(void)imageHeight;
-	if (imageWidth < 479) {
+	if (imageWidth < 479 && story_id == JOURNEY) {
+		// less scaling looks better for Journey
 		*xDeltaP = ASPECT_FIX_NUMERATOR-ASPECT_FIX_DENOMINATOR;
 		*xDenominatorP = ASPECT_FIX_DENOMINATOR;
 		*yDeltaP = 0;
