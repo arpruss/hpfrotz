@@ -1,6 +1,3 @@
-// TODO: check reverse
-// remove extra newline in input
-
 /*
  *
  * This file is part of Frotz.
@@ -184,7 +181,7 @@ void os_display_string (const zchar *s)
 
 	while ((c = *s++) != 0) {
 		if (c == ZC_NEW_FONT)
-			s++;
+			os_set_font(*s++);
 		else if (c == ZC_NEW_STYLE)
 			os_set_text_style(*s++);
 		else {
@@ -217,7 +214,7 @@ void os_stop_sample (int UNUSED (a)) {}
 int os_check_unicode(int UNUSED (font), zchar UNUSED (c))
 {
 	/* Only UTF-8 output, no input yet.  */
-	return 1;
+	return 0;
 } /* os_check_unicode */
 
 
@@ -233,10 +230,8 @@ int os_string_width (const zchar *s)
 	zchar c;
 
 	while ((c = *s++) != 0) {
-		if (c == ZC_NEW_STYLE)
+		if (c == ZC_NEW_STYLE || c == ZC_NEW_FONT)
 			s++;
-		else if (c == ZC_NEW_FONT)
-			os_set_font(*s++);
 		else
 			width += os_char_width(c);
 	}
@@ -317,7 +312,7 @@ zword os_to_true_colour(int UNUSED (index))
 void os_set_font(int new_font)
 {
 	current_font = new_font;
-	if (new_font == GRAPHICS_FONT && story_id != BEYOND_ZORK) // TODO
+	if (new_font == GRAPHICS_FONT)
 		setFont(font3,14);
 	else
 		setFont(font8x14,14);
@@ -359,7 +354,7 @@ void hp_init_output(void) {
 	hp_init_pictures();
 
 	if (story_id == BEYOND_ZORK) {
-//		z_header.flags |= GRAPHICS_FLAG; // use font3
+		z_header.flags |= GRAPHICS_FLAG; // use font3
 	}
 	
 	os_erase_area(1, 1, z_header.screen_rows, z_header.screen_cols, -2);
