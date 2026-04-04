@@ -77,15 +77,28 @@ void hp_close_pictures(void) {
 }
 
 void hp_init_pictures(void) {
-	if (story_id != JOURNEY)
-		return;
+	if (story_id == JOURNEY) {
+		picFile = fopen("journey.bw", "rb");
+		if (picFile == NULL) {
+			picFile = fopen("PIC.DATA", "rb");
+			if (picFile == NULL)
+				goto ERROR;
+		}
+	}
+	else if (story_id == SHOGUN) {
+		picFile = fopen("a5.bwmac.1", "rb");
+		if (picFile == NULL) {
+			picFile = fopen("PIC.DATA", "rb");
+			if (picFile == NULL)
+				goto ERROR;
+		}
+	}
+	else {
+		goto ERROR;
+	}
 	
 	fontHeight = getFontHeight();
 	fontWidth = getFontWidth();
-	
-	picFile = fopen("PIC.DATA", "rb");
-	if (picFile == NULL) 
-		goto ERROR;
 	
 	f_setup.blorb_file = "picFile"; // NOT ACTUALLY A BLORB FILE, BUT STOPS WARNINGS
 	
@@ -140,6 +153,9 @@ bool os_picture_data(int num, int *height, int *width){
 /* Huffman decompression code from Spatterlight */
 
 void drawImage(uint16_t x, uint16_t y, struct picture_directory* pd) {
+	if (picFile == NULL)
+		return;
+	
 	fseek(picFile, pd->data_address, SEEK_SET);
 	uint32_t remainingSize = 0;
 	fread(1+(char*)&remainingSize, 3, 1, picFile);
