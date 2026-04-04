@@ -176,7 +176,7 @@ void drawImage(uint16_t x, uint16_t y, struct picture_directory* pd) {
     unsigned char color_index = 0;
 
 	uint16_t lineSize = getScreenWidth()/4;
-	volatile uint16_t* posTop = SCREEN + y * lineSize + (x/4)*2;
+	volatile uint16_t* posTop = SCREEN + y * lineSize + (x/4);
 	uint8_t startMask = 1 << (3-x%4);
 	uint16_t imageY = 0;
 	uint16_t imageX = 0;	
@@ -290,7 +290,7 @@ void os_draw_picture (int num, int row, int col){
 	struct picture_directory* pd = directory;
 	for (unsigned short i=0; i<header.count; i++,pd++) 
 		if (pd->number == num) {
-			drawImage((col-1)*fontWidth, (row-1)*fontHeight, pd);
+			drawImage((col-1)*FONT_WIDTH, (row-1)*fontHeight, pd);
 			return;
 		}
 }
