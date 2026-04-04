@@ -317,7 +317,7 @@ zword os_to_true_colour(int UNUSED (index))
 void os_set_font(int new_font)
 {
 	current_font = new_font;
-	if (new_font == GRAPHICS_FONT)
+	if (new_font == GRAPHICS_FONT && story_id != BEYOND_ZORK) // TODO
 		setFont(font3,14);
 	else
 		setFont(font8x14,14);
