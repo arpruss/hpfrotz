@@ -1,0 +1,4 @@
+Put this directory in the C directory of the hp1653x development kit:
+  https://github.com/arpruss/hp165x_software_development
+
+Run: build.sh
