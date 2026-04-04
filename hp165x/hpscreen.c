@@ -139,7 +139,7 @@ bool os_repaint_window(int win, int ypos_old, int ypos_new, int xpos,
 
 int os_font_data(int font, int *height, int *width)
 {
-	if (font == TEXT_FONT || font == GRAPHICS_FONT) {
+	if (font == TEXT_FONT) { // TODO: GRAPHICS_FONT?
 		*height = 1;
 		*width = 1;
 		return 1;
@@ -331,11 +331,7 @@ void hp_init_output(void) {
 		z_header.flags &= ~SOUND_FLAG;
 	}
 
-	//z_header.flags &= ~GRAPHICS_FLAG;
-	if (story_id != JOURNEY)
-		z_header.flags &= ~GRAPHICS_FLAG;
-	else {
-		z_header.flags |= GRAPHICS_FLAG;
+	if (z_header.flags & GRAPHICS_FLAG) {
 		z_header.interpreter_number = INTERP_MACINTOSH;
 	}
 
