@@ -35,6 +35,7 @@
 
 static uint16_t savedX;
 static uint16_t savedY;
+extern unsigned char font3[];
 
 void hp_set_window(void) {
 	savedX = getTextX();
@@ -139,7 +140,7 @@ bool os_repaint_window(int win, int ypos_old, int ypos_new, int xpos,
 
 int os_font_data(int font, int *height, int *width)
 {
-	if (font == TEXT_FONT) { // TODO: GRAPHICS_FONT?
+	if (font == TEXT_FONT || font == GRAPHICS_FONT) {
 		*height = 1;
 		*width = 1;
 		return 1;
@@ -163,7 +164,7 @@ void os_set_colour (int newfg, int newbg)
 
 void os_display_char (zchar c)
 {
-	if (/*current_font == GRAPHICS_FONT && */ story_id == BEYOND_ZORK) {
+	if (story_id == BEYOND_ZORK && !(z_header.flags & GRAPHICS_FLAG)) {
 		putChar(c);
 	} else if (c >= ZC_LATIN1_MIN) {
 		putChar(latin1_to_ibm[c - ZC_LATIN1_MIN]);
@@ -316,6 +317,10 @@ zword os_to_true_colour(int UNUSED (index))
 void os_set_font(int new_font)
 {
 	current_font = new_font;
+	if (new_font == GRAPHICS_FONT)
+		setFont(font3,14);
+	else
+		setFont(font8x14,14);
 } /* os_set_font */
 
 
@@ -352,6 +357,10 @@ void hp_init_output(void) {
 	z_header.default_background = BLACK_COLOUR;
 	
 	hp_init_pictures();
+
+	if (story_id == BEYOND_ZORK) {
+//		z_header.flags |= GRAPHICS_FLAG; // use font3
+	}
 	
 	os_erase_area(1, 1, z_header.screen_rows, z_header.screen_cols, -2);
 }	
