@@ -163,10 +163,10 @@ void os_display_char (zchar c)
 {
 	if (story_id == BEYOND_ZORK && !(z_header.flags & GRAPHICS_FLAG)) {
 		putChar(c);
-	} else if (c >= ZC_LATIN1_MIN) {
-		putChar(latin1_to_ibm[c - ZC_LATIN1_MIN]);
 	} else if (c >= 32 && c <= 126) {
 		putChar(c);
+	} else if (c >= ZC_LATIN1_MIN) {
+		putChar(latin1_to_ibm[c - ZC_LATIN1_MIN]);
 	} else if (c == ZC_GAP) {
 		putText("  ");
 	} else if (c == ZC_INDENT) {

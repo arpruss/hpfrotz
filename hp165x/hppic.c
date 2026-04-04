@@ -31,8 +31,12 @@
 //pixel size: 0.2754mm x 0.3258mm
 //pixel height to width: 1.18:1
 
-#define STRETCH_NUM   118
-#define STRETCH_DEN   100
+#define ASPECT_FIX_NUMERATOR   118
+#define ASPECT_FIX_DENOMINATOR 100
+
+#define IMAGE_FULLSCREEN_WIDTH  480
+#define IMAGE_FULLSCREEN_HEIGHT 300
+
 #define FILE_BUFFER_SIZE   128
 
 static FILE* picFile = NULL;
@@ -61,6 +65,24 @@ static struct {
 static uint8_t* tree = NULL;
 static uint16_t fontWidth;
 static uint16_t fontHeight;
+
+// the scaling code does not work for a factor of 2 or greater
+static void getStretches(uint16_t imageWidth, uint16_t imageHeight, uint16_t* xDeltaP,
+	uint16_t* xDenominatorP, uint16_t* yDeltaP, uint16_t* yDenominatorP) {
+	(void)imageHeight;
+	if (imageWidth < 479) {
+		*xDeltaP = ASPECT_FIX_NUMERATOR-ASPECT_FIX_DENOMINATOR;
+		*xDenominatorP = ASPECT_FIX_DENOMINATOR;
+		*yDeltaP = 0;
+		*yDenominatorP = 1;
+	}	
+	else {
+		*xDeltaP = getScreenWidth()-IMAGE_FULLSCREEN_WIDTH;
+		*xDenominatorP = IMAGE_FULLSCREEN_WIDTH;
+		*yDeltaP = getScreenHeight()-IMAGE_FULLSCREEN_HEIGHT;
+		*yDenominatorP = IMAGE_FULLSCREEN_HEIGHT;
+	}
+}
 
 void hp_close_pictures(void) {
 	if (picFile != NULL) {
@@ -137,8 +159,15 @@ bool os_picture_data(int num, int *height, int *width){
 		struct picture_directory* pd = directory;
 		for (unsigned short i=0; i<header.count; i++, pd++) 
 			if (directory[i].number == num) {
-				*height = (directory[i].height + fontHeight - 1) / fontHeight;
-				*width = (directory[i].width * STRETCH_NUM / STRETCH_DEN + fontWidth - 1) / fontWidth;
+				uint16_t xDelta;
+				uint16_t xDenominator;
+				uint16_t yDelta;
+				uint16_t yDenominator;
+				
+				getStretches(directory[i].width,directory[i].height,&xDelta,&xDenominator,&yDelta,&yDenominator);
+				
+				*height = (directory[i].height * (yDelta+yDenominator)/yDenominator + fontHeight - 1) / fontHeight;
+				*width = (directory[i].width * (xDelta+xDenominator)/xDenominator + fontWidth - 1) / fontWidth;
 				return 1;
 			}
 		return 0;
@@ -155,6 +184,13 @@ bool os_picture_data(int num, int *height, int *width){
 void drawImage(uint16_t x, uint16_t y, struct picture_directory* pd) {
 	if (picFile == NULL)
 		return;
+	
+	uint16_t xDelta;
+	uint16_t xDenominator;
+	uint16_t yDelta;
+	uint16_t yDenominator;
+	
+	getStretches(pd->width,pd->height,&xDelta,&xDenominator,&yDelta,&yDenominator);
 	
 	fseek(picFile, pd->data_address, SEEK_SET);
 	uint32_t remainingSize = 0;
@@ -176,17 +212,17 @@ void drawImage(uint16_t x, uint16_t y, struct picture_directory* pd) {
     unsigned char color_index = 0;
 
 	uint16_t lineSize = getScreenWidth()/4;
-	volatile uint16_t* posTop = SCREEN + y * lineSize + (x/4);
 	uint8_t startMask = 1 << (3-x%4);
 	uint16_t imageY = 0;
+	uint16_t outY = y;
+
 	uint16_t imageX = 0;	
-	uint8_t mask = startMask;
-	volatile uint16_t* pos = posTop;
-	uint16_t stretchCount = 0;
+	uint16_t yStretchCount = 0;
 
 	uint16_t inBuffer = 0;
 	uint16_t bufferIndex = 0;
 	uint16_t toRead;
+	volatile uint16_t* posTop = SCREEN + x/4;
 
 	while (1) {
         if (repeats == 0) {
@@ -237,45 +273,55 @@ void drawImage(uint16_t x, uint16_t y, struct picture_directory* pd) {
         }
 
 		repeats--;
-		uint8_t pixel = (imageY == 0) ? color_index : (color_index ^ line[imageX]);
-		line[imageX] = pixel;
-
-		if (pixel != 0) {
-			if (pixel == 2) {
-				*SCREEN_MEMORY_CONTROL = WRITE_WHITE;
-			}
-			else if (pixel == 3) {
-				*SCREEN_MEMORY_CONTROL = WRITE_BLACK;
-			}
-			*pos = mask;
-		}
-		mask >>= 1;
-		if (mask == 0) {
-			pos++;
-			mask = 8;
-		}
-#if STRETCH_NUM > STRETCH_DEN
-		stretchCount += (STRETCH_NUM-STRETCH_DEN);
-		if (stretchCount >= STRETCH_DEN) {
-			if (pixel != 0)
-				*pos = mask;
-			mask >>= 1;
-			if (mask == 0) {
-				pos++;
-				mask = 8;
-			}
-			stretchCount -= STRETCH_DEN;
-		}
-#endif
+		line[imageX] = (imageY == 0) ? color_index : (color_index ^ line[imageX]);
 		imageX++;
+
 		if (imageX >= width) {
-			imageX = 0;
+			yStretchCount += yDelta;
+			do {
+				volatile uint16_t* pos = posTop + outY * lineSize;
+				uint16_t xStretchCount = 0;
+				uint8_t mask = startMask;
+
+				for (imageX=0; imageX<width; imageX++) {
+					uint8_t pixel = line[imageX];
+					
+					if (pixel != 0) {
+						if (pixel == 2) {
+							*SCREEN_MEMORY_CONTROL = WRITE_WHITE;
+						}
+						else if (pixel == 3) {
+							*SCREEN_MEMORY_CONTROL = WRITE_BLACK;
+						}
+						*pos = mask;
+					}
+					mask >>= 1;
+					if (mask == 0) {
+						pos++;
+						mask = 8;
+					}
+					xStretchCount += xDelta;
+					if (xStretchCount >= xDenominator) {
+						if (pixel != 0)
+							*pos = mask;
+						mask >>= 1;
+						if (mask == 0) {
+							pos++;
+							mask = 8;
+						}
+						xStretchCount -= xDenominator;
+					}
+				}
+				outY++;
+				if (yStretchCount < yDenominator)
+					break;
+				yStretchCount -= yDenominator;
+			} while(1);
+			
 			imageY++;
-			mask = startMask;
-			pos = posTop + imageY * lineSize;
-			stretchCount = 0;
 			if (imageY >= height)
 				break;
+			imageX = 0;
 		}
 	}
 
