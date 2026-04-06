@@ -253,7 +253,8 @@ int os_get_text_style(void)
 } /* os_get_text_style */
 
 void adjust_style(void) {
-	setTextReverse((current_style & (REVERSE_STYLE | BOLDFACE_STYLE | EMPHASIS_STYLE)) != 0);
+	setTextReverse((current_style & (REVERSE_STYLE | BOLDFACE_STYLE)) != 0);
+	setTextUnderline((current_style & EMPHASIS_STYLE) != 0);
 }
 
 void os_more_prompt(void)
@@ -321,6 +322,8 @@ void os_set_font(int new_font)
 
 void hp_init_output(void) {
 //	z_header.config |= CONFIG_COLOUR | CONFIG_BOLDFACE | CONFIG_EMPHASIS;
+
+	z_header.config &= ~CONFIG_COLOUR;
 
 	if (z_header.version == V3) {
 		z_header.config |= CONFIG_SPLITSCREEN;
