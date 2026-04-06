@@ -342,7 +342,12 @@ void os_draw_picture (int num, int row, int col){
 		}
 }
 
-int os_peek_colour (void) {return BLACK_COLOUR; }
+int os_peek_colour (void) {
+	if (readPixel(getTextX()*FONT_WIDTH, getTextY()*fontHeight,0))
+		return WHITE_COLOUR;
+	else
+		return BLACK_COLOUR;
+}
 
 void hp_pic_init(void) {
 }

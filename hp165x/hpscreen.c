@@ -33,8 +33,12 @@
 static uint16_t savedX;
 static uint16_t savedY;
 extern unsigned char font3[];
+static uint16_t savedFore = FOREGROUND;
+static uint16_t savedBack = BACKGROUND;
 
 void hp_set_window(void) {
+	savedFore = getTextForeground();
+	savedBack = getTextBackground();
 	savedX = getTextX();
 	savedY = getTextY();
 	uint16_t h = getFontHeight();
@@ -52,14 +56,12 @@ void hp_clear_window() {
 	*SCREEN_MEMORY_CONTROL = WRITE_OVERLAY_ERASE;
 	fillRectangle(WIN_X1*FONT_WIDTH-8,WIN_Y1*h-8,WIN_X2*FONT_WIDTH+8,WIN_Y2*h+8);
 	setTextWindow(0,0,0,0);
-	setTextColors(FOREGROUND,BACKGROUND);
+	setTextColors(savedFore,savedBack);
 	setTextXY(savedX,savedY);
 }
 
 static int current_style = 0;
 static int current_font = 0;
-static int current_fg = 1;
-static int current_bg = 0;
 
 char latin1_to_ibm[] = {
 	0x20, 0xad, 0xbd, 0x9c, 0xcf, 0xbe, 0xdd, 0xf5,
@@ -147,16 +149,10 @@ int os_font_data(int font, int *height, int *width)
 
 void os_set_colour (int newfg, int newbg)
 {
-	current_fg = newfg;
-	current_bg = newbg;
-	
-	if (newfg == BLACK_COLOUR && newbg == WHITE_COLOUR) {
-		setTextColors(BACKGROUND, FOREGROUND);
-	}
-	else {
-		setTextColors(FOREGROUND, BACKGROUND);
-	}
-		
+	uint16_t fg = newfg == BLACK_COLOUR ? BACKGROUND : FOREGROUND;
+	uint16_t bg = newbg == BLACK_COLOUR ? BACKGROUND : FOREGROUND;
+
+	setTextColors(fg, bg);
 } /* os_set_colour */
 
 void os_display_char (zchar c)
@@ -321,7 +317,7 @@ void os_set_font(int new_font)
 
 
 void hp_init_output(void) {
-//	z_header.config |= CONFIG_COLOUR | CONFIG_BOLDFACE | CONFIG_EMPHASIS;
+	z_header.config |= CONFIG_EMPHASIS;
 
 	z_header.config &= ~CONFIG_COLOUR;
 
