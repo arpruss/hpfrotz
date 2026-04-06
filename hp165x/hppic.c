@@ -343,6 +343,9 @@ void os_draw_picture (int num, int row, int col){
 }
 
 int os_peek_colour (void) {
+	if (0 == ( z_header.flags & GRAPHICS_FLAG ) )
+		return BLACK_COLOUR;
+	
 	if (readPixel(getTextX()*FONT_WIDTH, getTextY()*fontHeight,0))
 		return WHITE_COLOUR;
 	else

@@ -35,6 +35,8 @@ static uint16_t savedY;
 extern unsigned char font3[];
 static uint16_t savedFore = FOREGROUND;
 static uint16_t savedBack = BACKGROUND;
+static uint16_t currentFore = FOREGROUND;
+static uint16_t currentBack = BACKGROUND;
 
 void hp_set_window(void) {
 	savedFore = getTextForeground();
@@ -94,7 +96,20 @@ void os_erase_area(int top, int left, int bottom, int right, int win)
 	top--;
 	left--;
 	
-	*SCREEN_MEMORY_CONTROL = BACKGROUND;
+	Zwindow *cwp = curwinrec();
+	uint16_t maxRight;
+
+	if (cwp != NULL) {
+		maxRight = cwp->x_size - cwp->right + cwp->x_pos - 1;
+	}
+	else {
+		maxRight = screenWidth / FONT_WIDTH;
+	}
+	
+	if (right > maxRight)
+		right = maxRight;
+	
+	*SCREEN_MEMORY_CONTROL = currentBack; // BACKGROUND;
 	
 	uint16_t h = getFontHeight();
 
@@ -102,6 +117,8 @@ void os_erase_area(int top, int left, int bottom, int right, int win)
 		fillScreen();
 	else
 		fillRectangle(left * FONT_WIDTH, top * h, right * FONT_WIDTH, bottom * h);
+	
+	setTextXY(left,top);
 } /* os_erase_area */
 
 
@@ -149,10 +166,10 @@ int os_font_data(int font, int *height, int *width)
 
 void os_set_colour (int newfg, int newbg)
 {
-	uint16_t fg = newfg == BLACK_COLOUR ? BACKGROUND : FOREGROUND;
-	uint16_t bg = newbg == BLACK_COLOUR ? BACKGROUND : FOREGROUND;
-
-	setTextColors(fg, bg);
+	currentFore = newfg == BLACK_COLOUR ? BACKGROUND : FOREGROUND;
+	currentBack = newbg == BLACK_COLOUR ? BACKGROUND : FOREGROUND;
+	
+	setTextColors(currentFore, currentBack);
 } /* os_set_colour */
 
 void os_display_char (zchar c)
@@ -319,7 +336,8 @@ void os_set_font(int new_font)
 void hp_init_output(void) {
 	z_header.config |= CONFIG_EMPHASIS;
 
-	z_header.config &= ~CONFIG_COLOUR;
+	if (z_header.version < V6)
+		z_header.config &= ~CONFIG_COLOUR;
 
 	if (z_header.version == V3) {
 		z_header.config |= CONFIG_SPLITSCREEN;
