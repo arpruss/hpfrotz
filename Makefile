@@ -12,7 +12,7 @@ PREFIX=m68k-elf
 HPLIB=hp165x640
 PRINTF_VERSION= #--defsym=vfscanf=__d_vfscanf --defsym=vfprintf=__d_vfprintf 
 GCC_LIB_DIR=C:/68k/bin/../lib/gcc/m68k-elf/13.1.0/m$(CPU)/ 
-CFLAGS =-DNO_BLORB -DNO_BASENAME -DNO_SCRIPT -DFILENAME_MAX=10 -DMAX_FILE_NAME=10 -Wno-multichar
+CFLAGS =-DNO_BLORB -DNO_BASENAME -DFILENAME_MAX=10 -DMAX_FILE_NAME=10 -Wno-multichar # -DNO_SCRIPT 
 
 LIBRARY=picolibc
 ifeq ($(LIBRARY),picolibc)

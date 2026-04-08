@@ -672,6 +672,7 @@ char *hp_read_file_name (const char *default_name, int flag) {
 		
 		sprintf(prompt, "Please enter a filename [%s]: ", default_name);
 
+		*fullpath = 0;
 		if (hp_read_misc_line(fullpath, prompt, MAX_FILE_NAME - 4 + 1) < 0) {
 			hp_clear_window();
 			return NULL;
