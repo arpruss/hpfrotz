@@ -88,6 +88,7 @@ static void getStretches(uint16_t imageWidth, uint16_t imageHeight, uint16_t* xD
 void hp_close_pictures(void) {
 	if (picFile != NULL) {
 		fclose(picFile);
+        picFile = NULL;
 	}
 	if (directory != NULL) {
 		free(directory);
@@ -180,7 +181,8 @@ bool os_picture_data(int num, int *height, int *width){
 	}
 }	
 
-/* Huffman decompression code from Spatterlight */
+/* Huffman decompression code originally from Spatterlight, but optimized and made
+   to work with disk streaming. */
 
 void drawImage(uint16_t x, uint16_t y, struct picture_directory* pd) {
 	if (picFile == NULL)
@@ -209,7 +211,7 @@ void drawImage(uint16_t x, uint16_t y, struct picture_directory* pd) {
     memset(line, 0, width);
 
 	uint8_t decodeMask = 0;
-    unsigned char repeats = 0;
+    unsigned char outValue = 0;
     unsigned char colorIndex = 0;
 
 	uint16_t lineSize = getScreenWidth()/4;
@@ -225,17 +227,27 @@ void drawImage(uint16_t x, uint16_t y, struct picture_directory* pd) {
 	uint8_t currentByte = 0;
 	volatile uint16_t* posTop = SCREEN + x/4;
 
+    // Compression method:
+    //  Each row except the top one is replaced by a XOR of it with the previous row.
+    //  The full stream is RLE compressed.
+    //        0x00-0x0F = literal value
+    //        0x10-0x7F = repeat last literal value: value = repeat count plus 0x10
+    //  The RLE compressed stream is then Huffman encoded, with a common tree for all
+    //  the images, and with leaf nodes indicated by bit 7 set.
+
 	while (1) {
-        if (repeats == 0) {
-            // Repeat while bit 7 of count is unset
-            while (repeats < 0x80) {
+        if (outValue == 0) {
+            while (outValue < 0x80) {
                 if (decodeMask == 0) {
 					decodeMask = 0x80;
                     bufferIndex++;
 
                     if (bufferIndex >= inBuffer) {
+                        
                         if (remainingSize == 0)
                             goto DONE; // ERROR!
+                        
+                        // refill buffer
                         
                         uint16_t toRead;
                         
@@ -257,25 +269,26 @@ void drawImage(uint16_t x, uint16_t y, struct picture_directory* pd) {
 				}
                 
                 if (currentByte & decodeMask) {
-                    repeats = tree[2 * repeats + 1];
+                    outValue = tree[2 * outValue + 1];
                 } else {
-                    repeats = tree[2 * repeats];
+                    outValue = tree[2 * outValue];
                 }
 
 				decodeMask >>= 1;
             }
 
-            if (repeats >= 0x10+0x80) {
-                repeats -= 0xf+0x80;
+            if (outValue >= 0x90) {
+                outValue -= 0x90;
             }  else {
-                colorIndex = repeats&0x7F;
-                repeats = 1;
+                colorIndex = outValue&0x7F;
+                outValue = 0;
             }
         }
+        else {
+            outValue--;
+        }
 
-		repeats--;
-		line[imageX] ^= colorIndex; // TODO remove conditional
-		imageX++;
+		line[imageX++] ^= colorIndex; 
 
 		if (imageX >= width) {
             // line filled up, draw it, y-scaling as needed
@@ -296,32 +309,42 @@ void drawImage(uint16_t x, uint16_t y, struct picture_directory* pd) {
                         *SCREEN_MEMORY_CONTROL = WRITE_BLACK;
                         *pos = mask;
                     }
-					mask >>= 1;
-					if (mask == 0) {
+					
+                    mask >>= 1;
+					
+                    if (mask == 0) {
 						pos++;
 						mask = 8;
 					}
+                    
 					xStretchCount += xDelta;
-					if (xStretchCount >= xDenominator) {
+					
+                    if (xStretchCount >= xDenominator) {
 						if (pixel != 0)
 							*pos = mask;
-						mask >>= 1;
-						if (mask == 0) {
+					
+                        mask >>= 1;
+						
+                        if (mask == 0) {
 							pos++;
 							mask = 8;
 						}
-						xStretchCount -= xDenominator;
+						
+                        xStretchCount -= xDenominator;
 					}
 				}
+                
 				outY++;
+                
 				if (yStretchCount < yDenominator)
 					break;
+                
 				yStretchCount -= yDenominator;
 			} while(1);
 			
 			imageY++;
 			if (imageY >= height)
-				break;
+				break; // all done
 			imageX = 0;
 		}
 	}
@@ -350,7 +373,4 @@ int os_peek_colour (void) {
 		return WHITE_COLOUR;
 	else
 		return BLACK_COLOUR;
-}
-
-void hp_pic_init(void) {
 }
