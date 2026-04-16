@@ -206,6 +206,7 @@ void drawImage(uint16_t x, uint16_t y, struct picture_directory* pd) {
 	// store both input and output in one chunk to save memory and be
 	// more efficient
 	uint8_t* line = buffer+FILE_BUFFER_SIZE;
+    memset(line, 0, width);
 
 	uint8_t decodeMask = 0;
     unsigned char repeats = 0;
@@ -273,7 +274,7 @@ void drawImage(uint16_t x, uint16_t y, struct picture_directory* pd) {
         }
 
 		repeats--;
-		line[imageX] = (imageY == 0) ? colorIndex : (colorIndex ^ line[imageX]); // TODO remove conditional
+		line[imageX] ^= colorIndex; // TODO remove conditional
 		imageX++;
 
 		if (imageX >= width) {
