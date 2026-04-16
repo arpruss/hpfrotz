@@ -197,7 +197,6 @@ void drawImage(uint16_t x, uint16_t y, struct picture_directory* pd) {
 	uint32_t remainingSize = 0;
 	fread(1+(char*)&remainingSize, 3, 1, picFile);
 	fseek(picFile, 3, SEEK_CUR);
-	uint32_t bufpos = 0;
 
 	uint16_t width = pd->width;
 	uint16_t height = pd->height;
@@ -208,7 +207,7 @@ void drawImage(uint16_t x, uint16_t y, struct picture_directory* pd) {
 	// more efficient
 	uint8_t* line = buffer+FILE_BUFFER_SIZE;
 
-    uint8_t bit = 7;
+	uint8_t mask = 0x80;
     unsigned char repeats = 0;
     unsigned char color_index = 0;
 
@@ -222,62 +221,64 @@ void drawImage(uint16_t x, uint16_t y, struct picture_directory* pd) {
 
 	uint16_t inBuffer = 0;
 	uint16_t bufferIndex = 0;
-	uint16_t toRead;
+	uint8_t current_byte = 0;
 	volatile uint16_t* posTop = SCREEN + x/4;
 
 	while (1) {
         if (repeats == 0) {
             // Repeat while bit 7 of count is unset
             while (repeats < 0x80) {
+                if (mask == 0) {
+                    bufferIndex++;
+					mask = 0x80;
+					if (bufferIndex < inBuffer)
+						current_byte = buffer[bufferIndex];
+					// todo: move the next if() into here, and then start with mask=0 and bufferIndex=-1
+				}
 				if (bufferIndex >= inBuffer) {
 					if (remainingSize == 0)
 						goto DONE; // ERROR!
+                    
+                    uint16_t toRead;
+                    
 					if (remainingSize <= FILE_BUFFER_SIZE)
 						toRead = remainingSize;
 					else
 						toRead = FILE_BUFFER_SIZE;
+                    
 					inBuffer = fread(buffer, 1, toRead, picFile);
-					if (inBuffer == 0)
+					
+                    if (inBuffer == 0)
 						goto DONE; // ERROR
-					inBuffer = toRead;
-					bufpos += toRead;
+					
 					remainingSize -= inBuffer;
 					bufferIndex = 0;
+					current_byte = buffer[0];
 				}
-                // This conditional is inverted in
-                // the Magnetic code in ms_extract1().
-                // That code will add 1 and read from the subsequent
-                // byte in the array if the bit is *unset*.
-                // Here we do that if the bit is *set*.
-                if (buffer[bufferIndex] & (1 << bit)) {
+                
+                if (current_byte & mask) {
                     repeats = tree[2 * repeats + 1];
                 } else {
                     repeats = tree[2 * repeats];
                 }
 
-                if (!bit) {
-                    bufferIndex++;
-				}
-
-                bit = bit ? bit - 1 : 7;
+				mask >>= 1;
             }
 
-            repeats &= 0x7f;
-            if (repeats >= 0x10) {
-                // We subtract 1 less here than the
-                // Magnetic code in ms_extract1()
-                repeats -= 0xf;
+            if (repeats >= 0x10+0x80) {
+                repeats -= 0xf+0x80;
             }  else {
-                color_index = repeats;
+                color_index = repeats&0x7F;
                 repeats = 1;
             }
         }
 
 		repeats--;
-		line[imageX] = (imageY == 0) ? color_index : (color_index ^ line[imageX]);
+		line[imageX] = (imageY == 0) ? color_index : (color_index ^ line[imageX]); // TODO remove conditional
 		imageX++;
 
 		if (imageX >= width) {
+            // line filled up, draw it, y-scaling as needed
 			yStretchCount += yDelta;
 			do {
 				volatile uint16_t* pos = posTop + outY * lineSize;
@@ -287,15 +288,14 @@ void drawImage(uint16_t x, uint16_t y, struct picture_directory* pd) {
 				for (imageX=0; imageX<width; imageX++) {
 					uint8_t pixel = line[imageX];
 					
-					if (pixel != 0) {
-						if (pixel == 2) {
-							*SCREEN_MEMORY_CONTROL = WRITE_WHITE;
-						}
-						else if (pixel == 3) {
-							*SCREEN_MEMORY_CONTROL = WRITE_BLACK;
-						}
-						*pos = mask;
-					}
+                    if (pixel == 2) {
+                        *SCREEN_MEMORY_CONTROL = WRITE_WHITE;
+                        *pos = mask;
+                    }
+                    else if (pixel == 3) {
+                        *SCREEN_MEMORY_CONTROL = WRITE_BLACK;
+                        *pos = mask;
+                    }
 					mask >>= 1;
 					if (mask == 0) {
 						pos++;
