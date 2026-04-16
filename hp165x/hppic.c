@@ -37,7 +37,7 @@
 #define IMAGE_FULLSCREEN_WIDTH  480
 #define IMAGE_FULLSCREEN_HEIGHT 300
 
-#define FILE_BUFFER_SIZE   128
+#define FILE_BUFFER_SIZE   128 // must fit in int16_t
 
 static FILE* picFile = NULL;
 
@@ -207,74 +207,73 @@ void drawImage(uint16_t x, uint16_t y, struct picture_directory* pd) {
 	// more efficient
 	uint8_t* line = buffer+FILE_BUFFER_SIZE;
 
-	uint8_t mask = 0x80;
+	uint8_t decodeMask = 0;
     unsigned char repeats = 0;
-    unsigned char color_index = 0;
+    unsigned char colorIndex = 0;
 
 	uint16_t lineSize = getScreenWidth()/4;
-	uint8_t startMask = 1 << (3-x%4);
+	uint8_t startXMask = 1 << (3-x%4);
 	uint16_t imageY = 0;
 	uint16_t outY = y;
 
 	uint16_t imageX = 0;	
 	uint16_t yStretchCount = 0;
 
-	uint16_t inBuffer = 0;
-	uint16_t bufferIndex = 0;
-	uint8_t current_byte = 0;
+	int16_t inBuffer = 0;
+	int16_t bufferIndex = -1;
+	uint8_t currentByte = 0;
 	volatile uint16_t* posTop = SCREEN + x/4;
 
 	while (1) {
         if (repeats == 0) {
             // Repeat while bit 7 of count is unset
             while (repeats < 0x80) {
-                if (mask == 0) {
+                if (decodeMask == 0) {
+					decodeMask = 0x80;
                     bufferIndex++;
-					mask = 0x80;
-					if (bufferIndex < inBuffer)
-						current_byte = buffer[bufferIndex];
-					// todo: move the next if() into here, and then start with mask=0 and bufferIndex=-1
-				}
-				if (bufferIndex >= inBuffer) {
-					if (remainingSize == 0)
-						goto DONE; // ERROR!
-                    
-                    uint16_t toRead;
-                    
-					if (remainingSize <= FILE_BUFFER_SIZE)
-						toRead = remainingSize;
-					else
-						toRead = FILE_BUFFER_SIZE;
-                    
-					inBuffer = fread(buffer, 1, toRead, picFile);
-					
-                    if (inBuffer == 0)
-						goto DONE; // ERROR
-					
-					remainingSize -= inBuffer;
-					bufferIndex = 0;
-					current_byte = buffer[0];
+
+                    if (bufferIndex >= inBuffer) {
+                        if (remainingSize == 0)
+                            goto DONE; // ERROR!
+                        
+                        uint16_t toRead;
+                        
+                        if (remainingSize <= FILE_BUFFER_SIZE)
+                            toRead = remainingSize;
+                        else
+                            toRead = FILE_BUFFER_SIZE;
+                        
+                        inBuffer = fread(buffer, 1, toRead, picFile);
+                        
+                        if (inBuffer == 0)
+                            goto DONE; // ERROR
+                        
+                        remainingSize -= inBuffer;
+                        bufferIndex = 0;
+                    }
+
+                    currentByte = buffer[bufferIndex];
 				}
                 
-                if (current_byte & mask) {
+                if (currentByte & decodeMask) {
                     repeats = tree[2 * repeats + 1];
                 } else {
                     repeats = tree[2 * repeats];
                 }
 
-				mask >>= 1;
+				decodeMask >>= 1;
             }
 
             if (repeats >= 0x10+0x80) {
                 repeats -= 0xf+0x80;
             }  else {
-                color_index = repeats&0x7F;
+                colorIndex = repeats&0x7F;
                 repeats = 1;
             }
         }
 
 		repeats--;
-		line[imageX] = (imageY == 0) ? color_index : (color_index ^ line[imageX]); // TODO remove conditional
+		line[imageX] = (imageY == 0) ? colorIndex : (colorIndex ^ line[imageX]); // TODO remove conditional
 		imageX++;
 
 		if (imageX >= width) {
@@ -283,7 +282,7 @@ void drawImage(uint16_t x, uint16_t y, struct picture_directory* pd) {
 			do {
 				volatile uint16_t* pos = posTop + outY * lineSize;
 				uint16_t xStretchCount = 0;
-				uint8_t mask = startMask;
+				uint8_t mask = startXMask;
 
 				for (imageX=0; imageX<width; imageX++) {
 					uint8_t pixel = line[imageX];
