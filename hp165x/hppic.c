@@ -231,13 +231,13 @@ void drawImage(uint16_t x, uint16_t y, struct picture_directory* pd) {
     //  Each row except the top one is replaced by a XOR of it with the previous row.
     //  The full stream is RLE compressed.
     //        0x00-0x0F = literal value
-    //        0x10-0x7F = repeat last literal value: value = repeat count plus 0x10
+    //        0x10-0x7F = repeat last literal value: value = repeat count plus 0x0F
     //  The RLE compressed stream is then Huffman encoded, with a common tree for all
     //  the images, and with leaf nodes indicated by bit 7 set.
 
 	while (1) {
         if (outValue == 0) {
-            while (outValue < 0x80) {
+            do {
                 if (decodeMask == 0) {
 					decodeMask = 0x80;
                     bufferIndex++;
@@ -275,7 +275,7 @@ void drawImage(uint16_t x, uint16_t y, struct picture_directory* pd) {
                 }
 
 				decodeMask >>= 1;
-            }
+            } while (outValue < 0x80);
 
             if (outValue >= 0x90) {
                 outValue -= 0x90;

@@ -37,7 +37,7 @@ OBJCOPY=$(PREFIX)-objcopy
 OBJDUMP=$(PREFIX)-objdump
 
 CFLAGS+=-m$(CPU) $(LIBC_OPTIONS) --save-temps -Wno-unknown-pragmas -Wno-builtin-declaration-mismatch -Wall -Wextra -static -I../libhp165x -I$(LIBC_INCLUDE) -I. -msoft-float -MMD -MP -O99
-LFLAGS=--defsym=_program_end=0xA6FFFE -gc-sections $(PRINTF_VERSION) -L../libhp165x -L$(LIBC_LIB_DIR) --script=platform.ld -l$(HPLIB) -l$(LIBC) -l$(HPLIB) -l$(LIBC) -L$(GCC_LIB_DIR) -lgcc -Map=build/map
+LFLAGS=-gc-sections $(PRINTF_VERSION) -L../libhp165x -L$(LIBC_LIB_DIR) --script=platform.ld -l$(HPLIB) -l$(LIBC) -l$(HPLIB) -l$(LIBC) -L$(GCC_LIB_DIR) -lgcc -Map=build/map
 
 OBJS=$(patsubst %.c,$(BUILDDIR)/%.c.o,$(SRCS))
 OBJS:=$(patsubst %.S,$(BUILDDIR)/%.S.o,$(OBJS))
