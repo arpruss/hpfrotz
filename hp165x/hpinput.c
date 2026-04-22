@@ -26,7 +26,7 @@
 
 #include "hpfrotz.h"
 
-#define MAX_PICK_FILES 126
+#define MAX_PICK_FILES 144
 static uint16_t pickFileList[MAX_PICK_FILES];
 static uint16_t numPickFiles;
 static int pickFlag;
