@@ -241,7 +241,7 @@ void os_init_screen(void)
 int os_random_seed (void)
 {
 	if (user_random_seed == -1)	/* Use the epoch as seed value */
-		return (timeTenths() & 0x7fff);
+		return (getSeed32() & 0x7fff);
 	return user_random_seed;
 } /* os_random_seed */
 
