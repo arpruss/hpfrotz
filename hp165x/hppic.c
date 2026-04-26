@@ -117,6 +117,14 @@ void hp_init_pictures(void) {
 				goto ERROR;
 		}
 	}
+	else if (story_id == ARTHUR) {
+		picFile = fopen("arthur.bw", "rb");
+		if (picFile == NULL) {
+			picFile = fopen("PIC.DATA", "rb");
+			if (picFile == NULL)
+				goto ERROR;
+		}
+	}
 	else {
 		goto ERROR;
 	}
