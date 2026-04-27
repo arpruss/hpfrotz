@@ -34,12 +34,30 @@
 #define ASPECT_FIX_NUMERATOR   118
 #define ASPECT_FIX_DENOMINATOR 100
 
-#define IMAGE_FULLSCREEN_WIDTH  480
-#define IMAGE_FULLSCREEN_HEIGHT 300
+uint16_t imageFullscreenWidth=480;
+uint16_t imageFullscreenHeight=300;
 
 #define FILE_BUFFER_SIZE   128 // must fit in int16_t
 
+static enum {
+    CGA,
+    MAC
+} pictureFileType;
+
+  
 static FILE* picFile = NULL;
+
+#define MAX_FILENAME_OPTIONS 5
+
+static struct {
+    enum story story;
+    char* pictureFilenames[MAX_FILENAME_OPTIONS];
+} pictureFiles[] = {
+    { JOURNEY,   { "PIC.DATA", "JOURNEY.CG1", NULL } },
+    { ARTHUR,    { "PIC.DATA", "ARTHUR.CG1", NULL } },
+    { SHOGUN,    { "a5.bwmac.1", "PIC.DATA", "ARTHUR.CG1", NULL } },
+    { ZORK_ZERO, { "zork0.bwma", "zorkzero.b", "PIC.DATA", "ZORK0.CG1" } },
+};
 
 static struct picture_directory {
     uint16_t number;
@@ -55,8 +73,8 @@ static struct {
     uint16_t skip1;
     uint16_t count;
     uint16_t global_pointer;
-    uint8_t directory_entry_size;;
-    uint8_t skip2;
+    uint8_t directory_entry_size;
+     uint8_t skip2;
     uint16_t checksum;
     uint16_t skip3;
     uint16_t version;	
@@ -70,7 +88,7 @@ static uint16_t fontHeight;
 static void getStretches(uint16_t imageWidth, uint16_t imageHeight, uint16_t* xDeltaP,
 	uint16_t* xDenominatorP, uint16_t* yDeltaP, uint16_t* yDenominatorP) {
 	(void)imageHeight;
-	if (imageWidth < 479 && story_id == JOURNEY) {
+	if (pictureFileType == MAC && imageWidth < imageFullscreenWidth-1 && story_id == JOURNEY) {
 		// less scaling looks better for Journey
 		*xDeltaP = ASPECT_FIX_NUMERATOR-ASPECT_FIX_DENOMINATOR;
 		*xDenominatorP = ASPECT_FIX_DENOMINATOR;
@@ -78,11 +96,35 @@ static void getStretches(uint16_t imageWidth, uint16_t imageHeight, uint16_t* xD
 		*yDenominatorP = 1;
 	}	
 	else {
-		*xDeltaP = getScreenWidth()-IMAGE_FULLSCREEN_WIDTH;
-		*xDenominatorP = IMAGE_FULLSCREEN_WIDTH;
-		*yDeltaP = getScreenHeight()-IMAGE_FULLSCREEN_HEIGHT;
-		*yDenominatorP = IMAGE_FULLSCREEN_HEIGHT;
+		*xDeltaP = getScreenWidth()-imageFullscreenWidth;
+		*xDenominatorP = imageFullscreenWidth;
+		*yDeltaP = getScreenHeight()-imageFullscreenHeight;
+		*yDenominatorP = imageFullscreenHeight;
 	}
+}
+
+FILE* fopen_rb_caseInsensitive(const char* name) {
+    if (refreshDir()<0)
+        return NULL;
+    
+    FILE* f = fopen(name, "rb");
+    if (f != NULL)
+        return f;
+    
+    char hpName[MAX_FILENAME_LENGTH+1];
+    uint16_t type = getHPName(hpName, name);
+ 
+    DirEntry_t d;
+    
+    uint16_t i = 0;
+    
+    while (getDirEntry(i,&d) >= 0) {
+        if (d.type != 0 && !strcasecmp(hpName, d.name) && (type == 0 || d.type == type)) {
+            return fopen(d.name, "rb");
+        }
+        i++;
+    }
+    return NULL;
 }
 
 void hp_close_pictures(void) {
@@ -101,41 +143,47 @@ void hp_close_pictures(void) {
 }
 
 void hp_init_pictures(void) {
-	if (story_id == JOURNEY) {
-		picFile = fopen("journey.bw", "rb");
-		if (picFile == NULL) {
-			picFile = fopen("PIC.DATA", "rb");
-			if (picFile == NULL)
-				goto ERROR;
-		}
-	}
-	else if (story_id == SHOGUN) {
-		picFile = fopen("a5.bwmac.1", "rb");
-		if (picFile == NULL) {
-			picFile = fopen("PIC.DATA", "rb");
-			if (picFile == NULL)
-				goto ERROR;
-		}
-	}
-	else if (story_id == ARTHUR) {
-		picFile = fopen("arthur.bw", "rb");
-		if (picFile == NULL) {
-			picFile = fopen("PIC.DATA", "rb");
-			if (picFile == NULL)
-				goto ERROR;
-		}
-	}
-	else if (story_id == ZORK_ZERO) {
-		picFile = fopen("zorkzero.b", "rb");
-		if (picFile == NULL) {
-			picFile = fopen("PIC.DATA", "rb");
-			if (picFile == NULL)
-				goto ERROR;
-		}
-	}
-	else {
-		goto ERROR;
-	}
+    char filename[MAX_FILENAME_LENGTH+1];
+    strncpy(filename, f_setup.story_file, MAX_FILENAME_LENGTH+1);
+    filename[MAX_FILENAME_LENGTH] = 0;
+    char* ext = strrchr(filename, '.');
+    if (ext == NULL)
+        ext = filename+strlen(filename);
+    unsigned short baseLength = ext - filename;
+    picFile = NULL;
+    
+    if (baseLength + 2 < MAX_FILENAME_LENGTH) {
+        strncpy(ext, ".bw", MAX_FILENAME_LENGTH+1-baseLength);
+        filename[MAX_FILENAME_LENGTH] = 0;
+        picFile = fopen_rb_caseInsensitive(filename);
+        if (picFile == NULL) {
+            strncpy(ext, ".pic", MAX_FILENAME_LENGTH+1-baseLength);
+            filename[MAX_FILENAME_LENGTH] = 0;
+            picFile = fopen_rb_caseInsensitive(filename);
+        }
+    }
+    
+    if (picFile == NULL) {
+        for (uint16_t i=0; i<sizeof(pictureFiles)/sizeof(*pictureFiles); i++) {
+            if (story_id == pictureFiles[i].story) {
+                for (uint16_t j=0; j<MAX_FILENAME_OPTIONS && pictureFiles[i].pictureFilenames[j] != NULL ; j++) {
+                    picFile = fopen_rb_caseInsensitive(pictureFiles[i].pictureFilenames[j]);
+                    if (picFile != NULL)
+                        break;
+                }
+                break;
+            }
+        }
+        
+        if (picFile == NULL && baseLength + 2 < MAX_FILENAME_LENGTH) {
+            strncpy(ext, ".cg1", MAX_FILENAME_LENGTH+1-baseLength);
+            filename[MAX_FILENAME_LENGTH] = 0;
+            picFile = fopen_rb_caseInsensitive(filename);
+        }
+    }
+    
+    if (picFile == NULL)
+        goto ERROR;
 	
 	fontHeight = getFontHeight();
 	fontWidth = getFontWidth();
@@ -156,6 +204,9 @@ void hp_init_pictures(void) {
 		fseek(picFile, sizeof(header) + header.directory_entry_size*(i+1), SEEK_SET);
 	}
 	if (header.flags == 0xE) {
+        pictureFileType = MAC;
+        imageFullscreenWidth = 480;
+        imageFullscreenHeight = 300;
 		tree = malloc(256);
 		if (tree == NULL) {
 			goto ERROR;
@@ -163,6 +214,11 @@ void hp_init_pictures(void) {
 		fread(tree, 256, 1, picFile);
 		return;
 	}
+    else {
+        pictureFileType = CGA;
+        imageFullscreenWidth = 320;
+        imageFullscreenHeight = 200;
+    }
 
 ERROR:
 	hp_close_pictures();
@@ -197,10 +253,25 @@ bool os_picture_data(int num, int *height, int *width){
 	}
 }	
 
+static void drawImageCGA(uint16_t x, uint16_t y, struct picture_directory* pd) {
+	if (picFile == NULL)
+		return;
+	
+	uint16_t xDelta;
+	uint16_t xDenominator;
+	uint16_t yDelta;
+	uint16_t yDenominator;
+    uint8_t transparent = pd->flags & 1;
+	
+	getStretches(pd->width,pd->height,&xDelta,&xDenominator,&yDelta,&yDenominator);
+    
+    // unsupported
+}
+
 /* Huffman decompression code originally from Spatterlight, but optimized and made
    to work with disk streaming. */
 
-void drawImage(uint16_t x, uint16_t y, struct picture_directory* pd) {
+static void drawImageMac(uint16_t x, uint16_t y, struct picture_directory* pd) {
 	if (picFile == NULL)
 		return;
 	
@@ -376,7 +447,10 @@ void os_draw_picture (int num, int row, int col){
 	struct picture_directory* pd = directory;
 	for (unsigned short i=0; i<header.count; i++,pd++) 
 		if (pd->number == num) {
-			drawImage((col-1)*FONT_WIDTH, (row-1)*fontHeight, pd);
+            if (pictureFileType == MAC) 
+                drawImageMac((col-1)*FONT_WIDTH, (row-1)*fontHeight, pd);
+            else if (pictureFileType == CGA) 
+                drawImageCGA((col-1)*FONT_WIDTH, (row-1)*fontHeight, pd);
 			return;
 		}
 }
